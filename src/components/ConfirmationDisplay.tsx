@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react';
 import { motion, useAnimate } from 'motion/react';
 import confetti from 'canvas-confetti';
 import QRCodeSVG from 'react-qr-code';
+import { generateBadgePDF, downloadBadge } from '@/lib/badgeGenerator';
+import { toast } from 'sonner';
 
 interface ConfirmationDisplayProps {
   name: string;
+  email?: string;
   tableNumber: number;
   seatNumber?: number;
   isExisting?: boolean;
@@ -17,6 +20,7 @@ interface ConfirmationDisplayProps {
 
 export default function ConfirmationDisplay({
   name,
+  email = '',
   tableNumber,
   seatNumber = 1,
   isExisting = false,
@@ -26,7 +30,6 @@ export default function ConfirmationDisplay({
 }: ConfirmationDisplayProps) {
   const [scope, animate] = useAnimate();
   const [showQR, setShowQR] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (!isExisting) {
@@ -39,7 +42,7 @@ export default function ConfirmationDisplay({
         return Math.random() * (max - min) + min;
       };
 
-      const interval: any = setInterval(() => {
+      const interval: NodeJS.Timeout = setInterval(() => {
         const timeLeft = animationEnd - Date.now();
 
         if (timeLeft <= 0) {
@@ -83,12 +86,32 @@ export default function ConfirmationDisplay({
 
   const registrationData = JSON.stringify({
     name,
+    email,
     table: tableNumber,
     seat: seatNumber,
     phone,
     gender,
-    event: 'Fellowship Night',
+    event: 'CACSAUI Love Feast',
   });
+
+  // Handle badge download
+  const handleDownloadBadge = async () => {
+    try {
+      const badge = await generateBadgePDF({
+        name,
+        email: email || '',
+        phone,
+        gender,
+        tableNumber: tableNumber,
+        seatNumber: seatNumber,
+      });
+      downloadBadge(badge, `${name.replace(/\s+/g, '_')}_Badge.pdf`);
+      toast.success('Badge downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating badge:', error);
+      toast.error('Failed to generate badge. Please try again.');
+    }
+  };
 
   return (
     <motion.div
@@ -156,7 +179,7 @@ export default function ConfirmationDisplay({
           </p>
           {isExisting && (
             <p className="text-xs text-amber-600 mt-2">
-              You were already registered for this event
+              You were already registered for the Love Feast
             </p>
           )}
         </motion.div>
@@ -268,7 +291,7 @@ export default function ConfirmationDisplay({
                 <div className="w-2 h-2 rounded-full bg-green-600"></div>
               </div>
               <p className="text-sm text-neutral-600">
-                Check your email for event details
+                Check your email for Love Feast details
               </p>
             </div>
             <div className="flex items-start gap-3">
@@ -276,7 +299,7 @@ export default function ConfirmationDisplay({
                 <div className="w-2 h-2 rounded-full bg-green-600"></div>
               </div>
               <p className="text-sm text-neutral-600">
-                Arrive 10 minutes before the event starts
+                Arrive 10 minutes before the Love Feast starts
               </p>
             </div>
             <div className="flex items-start gap-3">
@@ -290,21 +313,40 @@ export default function ConfirmationDisplay({
           </div>
         </motion.div>
 
-        {/* Action Button */}
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.3 }}
-          onClick={onReset}
-          className="w-full py-3 px-4 border-2 border-neutral-300 hover:border-green-500 rounded-lg text-sm font-medium text-neutral-700 hover:text-green-700 hover:bg-green-50 transition-all duration-150 group"
-        >
-          <span className="flex items-center justify-center gap-2">
-            <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            {isExisting ? 'Back to Home' : 'Register Another Person'}
-          </span>
-        </motion.button>
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Download Badge Button */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.3 }}
+            onClick={handleDownloadBadge}
+            className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-lg text-sm font-medium text-white shadow-soft hover:shadow-md transition-all duration-150 group"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Download Badge as PDF
+            </span>
+          </motion.button>
+
+          {/* Register Another Button */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.3 }}
+            onClick={onReset}
+            className="w-full py-3 px-4 border-2 border-neutral-300 hover:border-green-500 rounded-lg text-sm font-medium text-neutral-700 hover:text-green-700 hover:bg-green-50 transition-all duration-150 group"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              {isExisting ? 'Back to Home' : 'Register Another Person'}
+            </span>
+          </motion.button>
+        </div>
       </div>
     </motion.div>
   );

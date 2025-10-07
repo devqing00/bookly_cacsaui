@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
@@ -16,7 +16,7 @@ async function checkAuthentication(): Promise<boolean> {
  * DELETE - Reset all data (delete all tables and activity logs)
  * This is a dangerous operation that requires admin authentication
  */
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   // Check authentication
   if (!(await checkAuthentication())) {
     return NextResponse.json(
@@ -59,10 +59,11 @@ export async function DELETE(request: NextRequest) {
         activityLogs: deletedLogs,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to reset data';
     console.error('Error resetting data:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to reset data' },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }

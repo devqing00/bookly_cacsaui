@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import {
-  collection,
-  getDocs,
-  query,
   doc,
-  updateDoc,
   runTransaction,
 } from 'firebase/firestore';
 import type { Table } from '@/types';
@@ -62,10 +58,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to restore attendee';
     console.error('Error restoring attendee:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to restore attendee' },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }

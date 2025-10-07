@@ -3,17 +3,15 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import type { Table } from '@/types';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   user: {
-    tableId: string;
-    tableNumber: number;
-    seatNumber: number;
-    name: string;
-    email: string;
+    table: Table;
+    seatIndex: number;
   } | null;
 }
 
@@ -28,11 +26,14 @@ export default function DeleteConfirmModal({
   const handleDelete = async () => {
     if (!user) return;
 
+    const attendee = user.table.attendees[user.seatIndex];
+    const tableWithId = user.table as Table & { id: string };
+
     setLoading(true);
 
     try {
       const response = await fetch(
-        `/api/admin/users?tableId=${user.tableId}&seatIndex=${user.seatNumber - 1}`,
+        `/api/admin/users?tableId=${tableWithId.id}&seatIndex=${user.seatIndex}`,
         {
           method: 'DELETE',
         }
@@ -53,15 +54,17 @@ export default function DeleteConfirmModal({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'delete',
-              attendeeName: user.name,
-              attendeeEmail: user.email,
-              tableNumber: user.tableNumber,
-              seatNumber: user.seatNumber,
-              details: 'Soft deleted user',
+              performedBy: 'admin',
+              targetUser: attendee.email,
+              attendeeName: attendee.name,
+              attendeeEmail: attendee.email,
+              tableNumber: user.table.tableNumber,
+              seatNumber: user.seatIndex + 1,
+              details: `Deleted user ${attendee.name} from Table ${user.table.tableNumber}, Seat ${user.seatIndex + 1}`,
             }),
           });
-        } catch (logError) {
-          console.error('Failed to log activity:', logError);
+        } catch (error) {
+          console.error('Failed to log delete activity:', error);
         }
         
         onSuccess();
@@ -78,6 +81,8 @@ export default function DeleteConfirmModal({
   };
 
   if (!isOpen || !user) return null;
+
+  const attendee = user.table.attendees[user.seatIndex];
 
   return (
     <AnimatePresence>
@@ -129,10 +134,10 @@ export default function DeleteConfirmModal({
             {/* User Info */}
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
               <p className="text-sm text-gray-600 mb-2">You are about to delete:</p>
-              <p className="font-semibold text-gray-900 text-lg">{user.name}</p>
-              <p className="text-sm text-gray-600">{user.email}</p>
+              <p className="font-semibold text-gray-900 text-lg">{attendee.name}</p>
+              <p className="text-sm text-gray-600">{attendee.email}</p>
               <p className="text-sm text-gray-600 mt-1">
-                Table {user.tableNumber}, Seat {user.seatNumber}
+                Table {user.table.tableNumber}, Seat {user.seatIndex + 1}
               </p>
             </div>
 
@@ -179,7 +184,7 @@ export default function DeleteConfirmModal({
                 <div className="flex-1 text-sm">
                   <p className="font-medium text-blue-900 mb-1">Undo Available</p>
                   <p className="text-blue-700 text-xs">
-                    Deleted users can be restored from the "Deleted Users" section in the admin
+                    Deleted users can be restored from the &quot;Deleted Users&quot; section in the admin
                     dashboard.
                   </p>
                 </div>

@@ -16,58 +16,58 @@ export default function ActivityLogPage() {
 
   // Check authentication on mount
   useEffect(() => {
+    const checkAuthentication = async () => {
+      try {
+        const response = await fetch('/api/auth/check-session');
+        const data = await response.json();
+
+        if (!data.authenticated) {
+          // Redirect to admin login with return URL
+          router.push('/admin?redirect=/activity-log');
+          return;
+        }
+
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.push('/admin?redirect=/activity-log');
+      }
+    };
+    
     checkAuthentication();
-  }, []);
+  }, [router]);
 
   // Fetch logs when filter changes (only if authenticated)
   useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const url = filter === 'all' 
+          ? '/api/activity-log?limit=100'
+          : `/api/activity-log?limit=100&action=${filter}`;
+          
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (response.status === 401) {
+          // Session expired, redirect to login
+          router.push('/admin?redirect=/activity-log');
+          return;
+        }
+
+        if (data.success) {
+          setLogs(data.logs || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch logs:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     if (isAuthenticated) {
       fetchLogs();
     }
-  }, [filter, isAuthenticated]);
-
-  const checkAuthentication = async () => {
-    try {
-      const response = await fetch('/api/auth/check-session');
-      const data = await response.json();
-
-      if (!data.authenticated) {
-        // Redirect to admin login with return URL
-        router.push('/admin?redirect=/activity-log');
-        return;
-      }
-
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Authentication check failed:', error);
-      router.push('/admin?redirect=/activity-log');
-    }
-  };
-
-  const fetchLogs = async () => {
-    try {
-      const url = filter === 'all' 
-        ? '/api/activity-log?limit=100'
-        : `/api/activity-log?limit=100&action=${filter}`;
-        
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (response.status === 401) {
-        // Session expired, redirect to login
-        router.push('/admin?redirect=/activity-log');
-        return;
-      }
-
-      if (data.success) {
-        setLogs(data.logs);
-      }
-    } catch (error) {
-      console.error('Failed to fetch activity logs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [filter, isAuthenticated, router]);
 
   // Show loading state while checking authentication
   if (!isAuthenticated) {

@@ -83,7 +83,7 @@ export default function ConfirmationModal({
               <div className="flex items-start space-x-3">
                 <div className="text-blue-600 text-xl">ℹ️</div>
                 <div className="flex-1 text-sm text-blue-800">
-                  By confirming, you'll be assigned to a table and seat. You'll receive your
+                  By confirming, you&apos;ll be assigned to a table and seat. You&apos;ll receive your
                   registration details and QR code for check-in.
                 </div>
               </div>

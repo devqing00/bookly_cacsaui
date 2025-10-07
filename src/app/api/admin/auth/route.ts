@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
           });
         }
       }
-    } catch (e) {
+    } catch {
       // Invalid token format
     }
 
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
 }
 
 // Logout - Clear session cookie
-export async function DELETE(req: NextRequest) {
+export async function DELETE() {
   try {
     const cookieStore = await cookies();
     cookieStore.delete('admin_session');

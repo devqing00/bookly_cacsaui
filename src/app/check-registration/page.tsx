@@ -9,7 +9,17 @@ import Link from 'next/link';
 export default function CheckRegistrationPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registration, setRegistration] = useState<any>(null);
+  const [registration, setRegistration] = useState<{
+    name: string;
+    email: string;
+    phone?: string;
+    gender?: string;
+    tableNumber: number;
+    seatNumber: number;
+    checkedIn?: boolean;
+    checkedInAt?: string;
+    registeredAt?: Date | string;
+  } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
@@ -60,7 +70,7 @@ export default function CheckRegistrationPage() {
     seat: registration.seatNumber,
     phone: registration.phone,
     gender: registration.gender,
-    event: 'Fellowship Night',
+    event: 'CACSAUI Love Feast',
   }) : '';
 
   return (
@@ -204,7 +214,7 @@ export default function CheckRegistrationPage() {
                 <h2 className="text-3xl font-bold text-neutral-900 mb-2">
                   Registration Found!
                 </h2>
-                <p className="text-neutral-600">Here are your event details</p>
+                <p className="text-neutral-600">Here are your Love Feast details</p>
               </div>
 
               {/* Details Grid */}

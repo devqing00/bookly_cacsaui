@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       const attendees = tableData.attendees || [];
 
       const index = attendees.findIndex(
-        (a: any) => a.email.toLowerCase() === email.toLowerCase() && !a.deleted
+        (a: { email: string; deleted?: boolean }) => a.email.toLowerCase() === email.toLowerCase() && !a.deleted
       );
 
       if (index !== -1) {
@@ -66,7 +66,6 @@ export async function POST(request: NextRequest) {
 
     // Update check-in status
     const tableRef = doc(db, 'tables', tableId!);
-    const tableSnapshot = await getDocs(query(collection(db, 'tables'), where('__name__', '==', tableId)));
     const currentTable = tablesSnapshot.docs.find(d => d.id === tableId)?.data();
 
     if (!currentTable) {
@@ -98,7 +97,7 @@ export async function POST(request: NextRequest) {
           attendeeEmail: foundAttendee.email,
           tableNumber: currentTable.tableNumber,
           seatNumber: attendeeIndex + 1,
-          details: 'Checked in at event',
+          details: 'Checked in at Love Feast',
           systemAction: true, // Mark as system action to bypass admin auth
         }),
       });
@@ -154,7 +153,7 @@ export async function GET(request: NextRequest) {
       const attendees = table.attendees || [];
 
       const index = attendees.findIndex(
-        (a: any) => a.email.toLowerCase() === email.toLowerCase() && !a.deleted
+        (a: { email: string; deleted?: boolean }) => a.email.toLowerCase() === email.toLowerCase() && !a.deleted
       );
 
       if (index !== -1) {

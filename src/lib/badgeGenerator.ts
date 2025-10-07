@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import QRCode from 'qrcode';
 
 export interface BadgeData {
@@ -36,11 +35,11 @@ export async function generateBadgePDF(attendee: BadgeData): Promise<Blob> {
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(18);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Fellowship Night', 50, 12, { align: 'center' });
+  pdf.text('CACSAUI Love Feast', 50, 12, { align: 'center' });
   
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('Event Badge', 50, 20, { align: 'center' });
+  pdf.text('University of Ibadan', 50, 20, { align: 'center' });
 
   // Attendee name
   pdf.setTextColor(17, 24, 39);
@@ -111,7 +110,6 @@ export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Bl
     format: 'a4',
   });
 
-  let currentPage = 0;
   const badgesPerPage = 4; // 2x2 grid on A4
   const badgeWidth = 100;
   const badgeHeight = 140;
@@ -124,7 +122,6 @@ export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Bl
     // Add new page if needed
     if (i > 0 && i % badgesPerPage === 0) {
       pdf.addPage();
-      currentPage++;
     }
 
     const positionIndex = i % badgesPerPage;
@@ -156,11 +153,11 @@ export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Bl
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Fellowship Night', xPos + badgeWidth / 2, yPos + 10, { align: 'center' });
+    pdf.text('CACSAUI Love Feast', xPos + badgeWidth / 2, yPos + 10, { align: 'center' });
     
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Event Badge', xPos + badgeWidth / 2, yPos + 16, { align: 'center' });
+    pdf.text('University of Ibadan', xPos + badgeWidth / 2, yPos + 16, { align: 'center' });
 
     // Name
     pdf.setTextColor(17, 24, 39);

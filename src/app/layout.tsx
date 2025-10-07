@@ -6,8 +6,8 @@ import { Toaster } from 'sonner'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Fellowship Night Registration',
-  description: 'Register for our church fellowship event and get your table assignment',
+  title: 'CACSAUI Love Feast Registration',
+  description: 'Register for CACSAUI Love Feast at University of Ibadan and get your table assignment',
 }
 
 export default function RootLayout({

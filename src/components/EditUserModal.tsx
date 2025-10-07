@@ -4,20 +4,13 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+import type { Table } from '@/types';
 
 interface EditUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  user: {
-    tableId: string;
-    tableNumber: number;
-    seatNumber: number;
-    name: string;
-    email: string;
-    phone: string;
-    gender: string;
-  } | null;
+  user: Table | null;
 }
 
 export default function EditUserModal({ isOpen, onClose, onSuccess, user }: EditUserModalProps) {
@@ -26,20 +19,22 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
   useEffect(() => {
     if (user) {
-      setName(user.name);
-      setEmail(user.email);
-      setPhone(user.phone);
-      setGender(user.gender);
+      const tableWithId = user as Table & { id: string; seatIndex: number };
+      const attendee = user.attendees[tableWithId.seatIndex];
+      setName(attendee.name);
+      setEmail(attendee.email);
+      setPhone(attendee.phone || '');
+      setGender(attendee.gender);
       setErrors({});
     }
   }, [user]);
 
   const validate = () => {
-    const newErrors: any = {};
+    const newErrors: Partial<Record<string, string>> = {};
 
     if (!name.trim()) {
       newErrors.name = 'Name is required';
@@ -79,12 +74,15 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
     setLoading(true);
 
     try {
+      // Cast user to include extended properties
+      const tableWithId = user as Table & { id: string; seatIndex: number };
+      
       const response = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tableId: user.tableId,
-          seatIndex: user.seatNumber - 1,
+          tableId: tableWithId.id,
+          seatIndex: tableWithId.seatIndex,
           name: name.trim(),
           email: email.trim().toLowerCase(),
           phone: phone.trim(),
@@ -99,6 +97,8 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
         
         // Log the edit activity
         try {
+          const tableWithId = user as Table & { id: string; seatIndex: number };
+          
           await fetch('/api/activity-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -107,7 +107,7 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
               attendeeName: name.trim(),
               attendeeEmail: email.trim().toLowerCase(),
               tableNumber: user.tableNumber,
-              seatNumber: user.seatNumber,
+              seatNumber: tableWithId.seatIndex + 1,
               details: `Updated user details`,
             }),
           });
@@ -142,6 +142,8 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
 
   if (!isOpen || !user) return null;
 
+  const tableWithId = user as Table & { id: string; seatIndex: number };
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -168,7 +170,7 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
               <div>
                 <h2 className="text-2xl font-bold">Edit User</h2>
                 <p className="text-indigo-100 mt-1 text-sm">
-                  Table {user.tableNumber}, Seat {user.seatNumber}
+                  Table {user.tableNumber}, Seat {tableWithId.seatIndex + 1}
                 </p>
               </div>
               <button

@@ -40,8 +40,8 @@ export default function Home() {
           });
           
           // Show capacity warnings if present
-          if ((data as any).capacityWarning) {
-            const warning = (data as any).capacityWarning;
+          if ('capacityWarning' in data && data.capacityWarning) {
+            const warning = data.capacityWarning as { level: string; message: string; percent: number };
             if (warning.level === 'full') {
               toast.error(warning.message, {
                 duration: 6000,
@@ -99,10 +99,10 @@ export default function Home() {
             </svg>
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-neutral-900 mb-4">
-            Fellowship Night
+            CACSAUI Love Feast
           </h1>
           <p className="text-base sm:text-lg text-neutral-600 max-w-2xl mx-auto">
-            Join us for an evening of community, faith, and friendship
+            Join us for an evening of fellowship and celebration at the University of Ibadan
           </p>
         </motion.div>
 
@@ -118,6 +118,7 @@ export default function Home() {
             <ConfirmationDisplay
               key="confirmation"
               name={registrationResult.name!}
+              email={registrationResult.email}
               tableNumber={registrationResult.tableNumber!}
               seatNumber={registrationResult.seatNumber}
               isExisting={registrationResult.isExisting}
@@ -135,7 +136,7 @@ export default function Home() {
           transition={{ delay: 0.6, duration: 0.4 }}
           className="text-center mt-16 text-xs text-neutral-500"
         >
-          <p>© 2025 University Church Fellowship</p>
+          <p>© 2025 CACSAUI - University of Ibadan</p>
         </motion.div>
       </div>
     </main>

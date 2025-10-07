@@ -6,7 +6,6 @@ import {
   getDocs,
   getDoc,
   addDoc,
-  updateDoc,
   doc,
   runTransaction,
   orderBy,
@@ -134,9 +133,10 @@ export async function POST(request: Request) {
         tableNumber: existingReg.tableNumber,
         seatNumber: existingReg.seatNumber,
         name: existingReg.name,
+        email: sanitizedEmail,
         phone: existingReg.phone,
         gender: existingReg.gender,
-        error: 'You are already registered for this event',
+        error: 'You are already registered for the Love Feast',
       });
     }
 
@@ -156,13 +156,12 @@ export async function POST(request: Request) {
             const q = query(
               tablesRef,
               where('seat_count', '<', MAX_SEATS_PER_TABLE),
-              orderBy('seat_count', 'asc'),
               orderBy('tableNumber', 'asc')
             );
             querySnapshot = await getDocs(q);
-          } catch (indexError: any) {
+          } catch (indexError: unknown) {
             // Fallback: If index doesn't exist yet, get all tables and filter manually
-            if (indexError.code === 'failed-precondition') {
+            if (indexError instanceof Error && 'code' in indexError && (indexError as { code: string }).code === 'failed-precondition') {
               console.log('Index not ready, using fallback query...');
               const allTablesQuery = query(tablesRef, orderBy('tableNumber', 'asc'));
               const allTables = await getDocs(allTablesQuery);
@@ -176,7 +175,7 @@ export async function POST(request: Request) {
               querySnapshot = {
                 docs: availableTables,
                 empty: availableTables.length === 0
-              } as any;
+              } as { docs: typeof availableTables; empty: boolean };
             } else {
               throw indexError;
             }
@@ -194,10 +193,13 @@ export async function POST(request: Request) {
           let seatNumber: number;
 
           if (!querySnapshot.empty) {
-            // Found a table with available seats
-            const firstAvailableTable = querySnapshot.docs[0];
-            const tableData = firstAvailableTable.data() as Table;
-            const tableRef = doc(db, TABLES_COLLECTION, firstAvailableTable.id);
+            // RANDOMIZED ASSIGNMENT: Pick a random table from available tables
+            const availableTables = querySnapshot.docs;
+            const randomIndex = Math.floor(Math.random() * availableTables.length);
+            const selectedTable = availableTables[randomIndex];
+            
+            const tableData = selectedTable.data() as Table;
+            const tableRef = doc(db, TABLES_COLLECTION, selectedTable.id);
 
             const updatedAttendees = [...tableData.attendees, newAttendee];
             const updatedSeatCount = updatedAttendees.length;
@@ -227,7 +229,7 @@ export async function POST(request: Request) {
             };
 
             // Add new table
-            const newTableRef = await addDoc(tablesRef, {
+            await addDoc(tablesRef, {
               ...newTable,
               table_id: `table_${newTableNumber}`,
             });
@@ -241,6 +243,7 @@ export async function POST(request: Request) {
             tableNumber: assignedTableNumber,
             seatNumber,
             name: sanitizedName,
+            email: sanitizedEmail,
             phone: sanitizedPhone,
             gender: sanitizedGender,
           };
@@ -257,13 +260,13 @@ export async function POST(request: Request) {
             
             // Add capacity warning to response
             if (capacityPercent >= 100) {
-              (result as any).capacityWarning = {
+              (result as { success: boolean; tableNumber: number; seatNumber: number; name: string; phone: string; gender: string; capacityWarning?: { level: string; message: string; percent: number } }).capacityWarning = {
                 level: 'full',
                 message: `Table ${result.tableNumber} is now FULL (${tableData.seat_count}/${tableData.maxCapacity} seats)`,
                 percent: 100
               };
             } else if (capacityPercent >= 80) {
-              (result as any).capacityWarning = {
+              (result as { success: boolean; tableNumber: number; seatNumber: number; name: string; phone: string; gender: string; capacityWarning?: { level: string; message: string; percent: number } }).capacityWarning = {
                 level: 'warning',
                 message: `Table ${result.tableNumber} is ${capacityPercent.toFixed(0)}% full (${tableData.seat_count}/${tableData.maxCapacity} seats)`,
                 percent: capacityPercent
@@ -273,7 +276,7 @@ export async function POST(request: Request) {
         }
         
         break; // Success, exit retry loop
-      } catch (error: any) {
+      } catch (error: unknown) {
         retries--;
         if (retries === 0) throw error;
         // Wait before retry
@@ -281,14 +284,46 @@ export async function POST(request: Request) {
       }
     }
 
+    // Send confirmation email after successful registration (non-blocking)
+    if (result?.success) {
+      const qrData = JSON.stringify({
+        name: result.name,
+        email: sanitizedEmail,
+        table: result.tableNumber,
+        seat: result.seatNumber,
+        phone: result.phone,
+        gender: result.gender,
+        event: 'CACSAUI Love Feast',
+      });
+
+      // Send email asynchronously without blocking the response
+      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: sanitizedEmail,
+          name: result.name,
+          tableNumber: result.tableNumber,
+          seatNumber: result.seatNumber,
+          phone: result.phone,
+          gender: result.gender,
+          qrData,
+        }),
+      }).catch(emailError => {
+        // Log email error but don't fail the registration
+        console.error('Failed to send confirmation email:', emailError);
+      });
+    }
+
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to register. Please try again.';
     console.error('Registration error:', error);
     
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to register. Please try again.',
+        error: errorMessage,
       },
       { status: 500 }
     );
@@ -335,10 +370,11 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json({ tables });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch data';
     console.error('Error fetching data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch data' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

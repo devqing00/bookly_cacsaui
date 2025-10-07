@@ -22,6 +22,7 @@ export interface RegistrationResponse {
   success: boolean;
   tableNumber?: number;
   name?: string;
+  email?: string;
   error?: string;
   isExisting?: boolean;
   seatNumber?: number;
@@ -66,7 +67,7 @@ export interface ActivityLog {
   seatNumber?: number; // Seat number
   details: string;
   timestamp: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DeletedRegistration {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -15,18 +15,17 @@ import LoginModal from '@/components/LoginModal';
 import Link from 'next/link';
 import { generateBadgePDF, generateBatchBadgesPDF, downloadBadge, type BadgeData } from '@/lib/badgeGenerator';
 
-export default function AdminPage() {
+function AdminPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [tables, setTables] = useState<Table[]>([]);
-  const [filteredTables, setFilteredTables] = useState<Table[]>([]);
+  const [tables, setTables] = useState<(Table & { id: string })[]>([]);
+  const [filteredTables, setFilteredTables] = useState<(Table & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'full'>('all');
-  const [editUser, setEditUser] = useState<any>(null);
-  const [deleteUser, setDeleteUser] = useState<any>(null);
+  const [editUser, setEditUser] = useState<Table | null>(null);
+  const [deleteUser, setDeleteUser] = useState<{ table: Table; seatIndex: number } | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
@@ -52,7 +51,6 @@ export default function AdminPage() {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          setSessionToken(token);
           setIsAuthenticated(true);
         } else {
           localStorage.removeItem('adminSessionToken');
@@ -67,7 +65,6 @@ export default function AdminPage() {
   // Handle successful login
   const handleLogin = (token: string) => {
     localStorage.setItem('adminSessionToken', token);
-    setSessionToken(token);
     setIsAuthenticated(true);
     
     // Check if there's a redirect URL
@@ -83,7 +80,6 @@ export default function AdminPage() {
   // Handle logout
   const handleLogout = () => {
     localStorage.removeItem('adminSessionToken');
-    setSessionToken(null);
     setIsAuthenticated(false);
     toast.success('Logged out successfully');
   };
@@ -97,9 +93,9 @@ export default function AdminPage() {
       q,
       (snapshot) => {
         const tablesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
           ...doc.data(),
-        })) as any as Table[];
+          id: doc.id,
+        } as Table & { id: string }));
 
         setTables(tablesData);
         setLoading(false);
@@ -224,34 +220,26 @@ export default function AdminPage() {
   };
 
   // Edit user handler
-  const handleEditClick = (table: Table, attendeeIndex: number) => {
+  const handleEditClick = (table: Table & { id: string }, attendeeIndex: number) => {
     const attendee = table.attendees[attendeeIndex];
     setEditUser({
-      tableId: (table as any).id, // Use Firestore document ID
-      tableNumber: table.tableNumber,
-      seatNumber: attendeeIndex + 1,
-      name: attendee.name,
-      email: attendee.email,
-      phone: attendee.phone || '',
-      gender: attendee.gender || '',
-    });
+      ...table,
+      seatIndex: attendeeIndex,
+      ...attendee,
+    } as unknown as Table);
   };
 
   // Delete user handler
-  const handleDeleteClick = (table: Table, attendeeIndex: number) => {
-    const attendee = table.attendees[attendeeIndex];
+  const handleDeleteClick = (table: Table & { id: string }, attendeeIndex: number) => {
     setDeleteUser({
-      tableId: (table as any).id, // Use Firestore document ID
-      tableNumber: table.tableNumber,
-      seatNumber: attendeeIndex + 1,
-      name: attendee.name,
-      email: attendee.email,
+      table: table as unknown as Table,
+      seatIndex: attendeeIndex,
     });
   };
 
   // Restore user handler
-  const handleRestoreClick = async (table: Table, attendeeIndex: number) => {
-    const tableId = (table as any).id; // Use Firestore document ID
+  const handleRestoreClick = async (table: Table & { id: string }, attendeeIndex: number) => {
+    const tableId = table.id; // Use Firestore document ID
     const attendee = table.attendees[attendeeIndex];
     
     try {
@@ -417,10 +405,10 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-neutral-900 mb-2">
-                Event Dashboard
+                Love Feast Dashboard
               </h1>
               <p className="text-sm text-neutral-600">
-                Real-time view of all registered attendees and table assignments
+                Real-time view of all registered attendees and table assignments for CACSAUI&apos;s Love Feast
               </p>
             </div>
           </div>
@@ -516,7 +504,7 @@ export default function AdminPage() {
               <div className="flex flex-wrap gap-2 flex-1">
                 <select
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  onChange={(e) => setFilterStatus(e.target.value as 'all' | 'available' | 'full')}
                   className="flex-1 sm:flex-initial min-w-[120px] px-3 py-2.5 border border-neutral-300 rounded-lg focus:border-green-500 focus:ring-0 focus:outline-none transition-all bg-white text-sm"
                   aria-label="Filter tables by status"
                 >
@@ -553,7 +541,7 @@ export default function AdminPage() {
                 <Link
                   href="/check-in"
                   className="flex-1 sm:flex-initial px-3 py-2.5 border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
-                  title="Event Check-In"
+                  title="Love Feast Check-In"
                 >
                   <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -634,9 +622,9 @@ export default function AdminPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <AnimatePresence>
-              {filteredTables.map((table: any, index) => {
+              {filteredTables.map((table: Table & { id: string }, index) => {
                 // Calculate actual seat count from non-deleted attendees
-                const actualSeatCount = table.attendees.filter((a: any) => !a.deleted).length;
+                const actualSeatCount = table.attendees.filter((a) => !a.deleted).length;
                 
                 return (
               <motion.div
@@ -660,7 +648,7 @@ export default function AdminPage() {
                       <h2 className="text-xl font-bold text-neutral-900">
                         Table {table.tableNumber}
                       </h2>
-                      {table.attendees.filter((a: any) => !a.deleted).length > 0 && (
+                      {table.attendees.filter((a) => !a.deleted).length > 0 && (
                         <button
                           onClick={() => handlePrintTableBadges(table)}
                           className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-1"
@@ -714,7 +702,7 @@ export default function AdminPage() {
 
                 {/* Attendees List */}
                 <div className="space-y-3 relative z-10">
-                  {table.attendees.map((attendee: any, idx: number) => (
+                  {table.attendees.map((attendee, idx: number) => (
                     <div
                       key={idx}
                       className={`border-l-2 ${
@@ -762,7 +750,7 @@ export default function AdminPage() {
                               🕒 Registered: {format(
                                 attendee.registeredAt instanceof Date 
                                   ? attendee.registeredAt 
-                                  : new Date(attendee.registeredAt.seconds * 1000),
+                                  : new Date((attendee.registeredAt as { seconds: number }).seconds * 1000),
                                 'MMM d, yyyy h:mm a'
                               )}
                             </p>
@@ -878,7 +866,7 @@ export default function AdminPage() {
 
         {/* Back Button */}
         <div className="mt-12 pt-8 border-t border-neutral-200">
-          <a
+          <Link
             href="/"
             className="text-sm font-medium text-neutral-700 hover:text-green-700 transition-colors duration-150 inline-flex items-center gap-2 group"
           >
@@ -886,7 +874,7 @@ export default function AdminPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
             Back to Registration
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -915,5 +903,13 @@ export default function AdminPage() {
         onSuccess={refreshData}
       />
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900"><p className="text-white text-xl">Loading...</p></div>}>
+      <AdminPageContent />
+    </Suspense>
   );
 }

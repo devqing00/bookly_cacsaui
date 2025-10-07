@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import { motion, AnimatePresence } from 'motion/react';
@@ -32,87 +32,66 @@ export default function CheckInPage() {
 
   // Check authentication on mount
   useEffect(() => {
-    checkAuthentication();
-  }, []);
+    const checkAuthentication = async () => {
+      try {
+        const response = await fetch('/api/auth/check-session');
+        const data = await response.json();
 
-  const checkAuthentication = async () => {
+        if (!data.authenticated) {
+          // Redirect to admin login with return URL
+          toast.error('Please login to access check-in');
+          router.push('/admin?redirect=/check-in');
+          return;
+        }
+
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        toast.error('Authentication failed. Please login.');
+        router.push('/admin?redirect=/check-in');
+      }
+    };
+    
+    checkAuthentication();
+  }, [router]);
+
+  const performCheckIn = useCallback(async (email: string) => {
+    setLoading(true);
+
     try {
-      const response = await fetch('/api/auth/check-session');
+      const response = await fetch('/api/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
       const data = await response.json();
 
-      if (!data.authenticated) {
-        // Redirect to admin login with return URL
-        toast.error('Please login to access check-in');
-        router.push('/admin?redirect=/check-in');
-        return;
+      if (data.success) {
+        toast.success(`✅ ${data.name} checked in successfully!`, {
+          description: `Table ${data.tableNumber}, Seat ${data.seatNumber}`,
+          duration: 5000,
+        });
+        
+        setLastCheckIn(data);
+        setManualEmail('');
+      } else if (data.alreadyCheckedIn) {
+        toast.error('Already checked in', {
+          description: `Checked in at ${new Date(data.checkedInAt).toLocaleString()}`,
+          duration: 4000,
+        });
+      } else {
+        toast.error(data.error || 'Check-in failed');
       }
-
-      setIsAuthenticated(true);
     } catch (error) {
-      console.error('Authentication check failed:', error);
-      toast.error('Authentication failed. Please login.');
-      router.push('/admin?redirect=/check-in');
+      console.error('Check-in error:', error);
+      toast.error('An error occurred during check-in');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  // Initialize QR scanner (only if authenticated)
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    if (mode === 'scanner' && scannerActive) {
-      startScanner();
-    }
-
-    return () => {
-      stopScanner();
-    };
-  }, [mode, scannerActive, isAuthenticated]);
-
-  const startScanner = async () => {
-    try {
-      setCameraError('');
-      const codeReader = new BrowserMultiFormatReader();
-      codeReaderRef.current = codeReader;
-
-      const videoInputDevices = await codeReader.listVideoInputDevices();
-      
-      if (videoInputDevices.length === 0) {
-        setCameraError('No camera found. Please use manual check-in.');
-        setScannerActive(false);
-        return;
-      }
-
-      // Use the first available camera (usually back camera on mobile)
-      const selectedDeviceId = videoInputDevices[0].deviceId;
-
-      await codeReader.decodeFromVideoDevice(
-        selectedDeviceId,
-        videoRef.current!,
-        async (result, error) => {
-          if (result) {
-            const qrData = result.getText();
-            await handleQRScan(qrData);
-          }
-          if (error && !(error instanceof NotFoundException)) {
-            console.error('Scanner error:', error);
-          }
-        }
-      );
-    } catch (error: any) {
-      console.error('Camera error:', error);
-      setCameraError(error.message || 'Failed to access camera. Please use manual check-in.');
-      setScannerActive(false);
-    }
-  };
-
-  const stopScanner = () => {
-    if (codeReaderRef.current) {
-      codeReaderRef.current.reset();
-      codeReaderRef.current = null;
-    }
-  };
-
-  const handleQRScan = async (qrData: string) => {
+  const handleQRScan = useCallback(async (qrData: string) => {
     try {
       // Extract email from QR data
       // Format: "Name: John Doe\nEmail: john@example.com\n..."
@@ -137,6 +116,67 @@ export default function CheckInPage() {
       console.error('QR scan error:', error);
       toast.error('Failed to process QR code');
     }
+  }, [performCheckIn, mode]);
+
+  // Initialize QR scanner (only if authenticated)
+  useEffect(() => {
+    const startScanner = async () => {
+      try {
+        setCameraError('');
+        const codeReader = new BrowserMultiFormatReader();
+        codeReaderRef.current = codeReader;
+
+        const videoInputDevices = await codeReader.listVideoInputDevices();
+        
+        if (videoInputDevices.length === 0) {
+          setCameraError('No camera found. Please use manual check-in.');
+          setScannerActive(false);
+          return;
+        }
+
+        // Use the first available camera
+        const selectedDeviceId = videoInputDevices[0].deviceId;
+
+        codeReader.decodeFromVideoDevice(
+          selectedDeviceId,
+          videoRef.current!,
+          (result, error) => {
+            if (result) {
+              handleQRScan(result.getText());
+            }
+            if (error && !(error instanceof NotFoundException)) {
+              console.error('Scanner error:', error);
+            }
+          }
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to access camera. Please use manual check-in.';
+        console.error('Camera error:', error);
+        setCameraError(errorMessage);
+        setScannerActive(false);
+      }
+    };
+
+    if (!isAuthenticated) return;
+
+    if (mode === 'scanner' && scannerActive) {
+      startScanner();
+    }
+
+    return () => {
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+        codeReaderRef.current = null;
+      }
+    };
+  }, [mode, scannerActive, isAuthenticated, handleQRScan]);
+
+  const stopScanner = () => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset();
+      codeReaderRef.current = null;
+    }
+    setScannerActive(false);
   };
 
   const handleManualCheckIn = async (e: React.FormEvent) => {
@@ -148,35 +188,6 @@ export default function CheckInPage() {
     }
 
     await performCheckIn(manualEmail.trim());
-  };
-
-  const performCheckIn = async (email: string) => {
-    setLoading(true);
-
-    try {
-      const response = await fetch('/api/check-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`✅ ${data.attendee.name} checked in successfully!`);
-        setLastCheckIn(data.attendee);
-        setManualEmail('');
-      } else if (data.alreadyCheckedIn) {
-        toast.warning(`⚠️ ${data.attendee.name} already checked in at ${new Date(data.checkedInAt.seconds * 1000).toLocaleTimeString()}`);
-      } else {
-        toast.error(data.error || 'Check-in failed');
-      }
-    } catch (error) {
-      console.error('Check-in error:', error);
-      toast.error('Failed to check in. Please try again.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Show loading state while checking authentication
@@ -202,10 +213,10 @@ export default function CheckInPage() {
           className="text-center mb-8"
         >
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-3">
-            Event Check-In
+            Love Feast Check-In
           </h1>
           <p className="text-gray-600">
-            Scan QR code or enter email to check in
+            Scan QR code or enter email to check in attendees
           </p>
         </motion.div>
 

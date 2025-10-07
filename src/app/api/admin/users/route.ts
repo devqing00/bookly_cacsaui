@@ -44,7 +44,17 @@ export async function GET() {
     const q = query(tablesRef, orderBy('tableNumber', 'asc'));
     const querySnapshot = await getDocs(q);
 
-    const allAttendees: any[] = [];
+    const allAttendees: Array<{
+      tableId: string;
+      tableNumber: number;
+      seatNumber: number;
+      name: string;
+      email: string;
+      phone?: string;
+      gender?: string;
+      checkedIn?: boolean;
+      checkedInAt?: string;
+    }> = [];
 
     querySnapshot.forEach((doc) => {
       const tableData = doc.data() as Table;
@@ -54,17 +64,23 @@ export async function GET() {
             tableId: doc.id,
             tableNumber: tableData.tableNumber,
             seatNumber: index + 1,
-            ...attendee,
+            name: attendee.name,
+            email: attendee.email,
+            phone: attendee.phone,
+            gender: attendee.gender,
+            checkedIn: attendee.checkedIn,
+            checkedInAt: attendee.checkedInAt?.toString(),
           });
         }
       });
     });
 
     return NextResponse.json({ attendees: allAttendees });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch attendees';
     console.error('Error fetching attendees:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch attendees' },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }
@@ -156,7 +172,7 @@ export async function PUT(request: Request) {
     if (sanitizedName) updatedAttendees[seatIndex].name = sanitizedName;
     if (sanitizedEmail) updatedAttendees[seatIndex].email = sanitizedEmail;
     if (sanitizedPhone !== undefined) updatedAttendees[seatIndex].phone = sanitizedPhone;
-    if (sanitizedGender) updatedAttendees[seatIndex].gender = sanitizedGender as any;
+    if (sanitizedGender) updatedAttendees[seatIndex].gender = sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say';
 
     await updateDoc(tableRef, {
       attendees: updatedAttendees,
@@ -167,10 +183,11 @@ export async function PUT(request: Request) {
       message: 'Attendee updated successfully',
       attendee: updatedAttendees[seatIndex],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update attendee';
     console.error('Error updating attendee:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update attendee' },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }
@@ -230,10 +247,11 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete attendee';
     console.error('Error deleting attendee:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to delete attendee' },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }
