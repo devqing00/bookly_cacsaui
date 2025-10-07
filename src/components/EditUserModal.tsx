@@ -49,12 +49,13 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
     }
 
     if (phone && phone.trim()) {
-      try {
-        if (!isValidPhoneNumber(phone, 'US')) {
-          newErrors.phone = 'Invalid phone number';
-        }
-      } catch {
-        newErrors.phone = 'Invalid phone number';
+      const cleanPhone = phone.trim();
+      // Accept Nigerian format (starts with 0, 11 digits) or international format
+      const nigerianFormat = /^0\d{10}$/; // 0XXXXXXXXXX (11 digits)
+      const internationalFormat = /^\+?\d{10,15}$/; // International with optional +
+      
+      if (!nigerianFormat.test(cleanPhone) && !internationalFormat.test(cleanPhone.replace(/[\s()-]/g, ''))) {
+        newErrors.phone = 'Please enter a valid Nigerian phone number';
       }
     }
 

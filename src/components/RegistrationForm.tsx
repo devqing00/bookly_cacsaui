@@ -78,12 +78,13 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
     if (!phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else {
-      try {
-        if (!isValidPhoneNumber(phone, 'US')) {
-          newErrors.phone = 'Please enter a valid phone number';
-        }
-      } catch {
-        newErrors.phone = 'Please enter a valid phone number';
+      const cleanPhone = phone.trim();
+      // Accept Nigerian format (starts with 0, 11 digits) or international format
+      const nigerianFormat = /^0\d{10}$/; // 0XXXXXXXXXX (11 digits)
+      const internationalFormat = /^\+?\d{10,15}$/; // International with optional +
+      
+      if (!nigerianFormat.test(cleanPhone) && !internationalFormat.test(cleanPhone.replace(/[\s()-]/g, ''))) {
+        newErrors.phone = 'Please enter a valid Nigerian phone number (e.g., 08012345678 or +2348012345678)';
       }
     }
 
@@ -118,11 +119,26 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
   };
 
   const formatPhoneDisplay = (value: string) => {
+    if (!value) return value;
+    
+    const cleanPhone = value.replace(/[\s()-]/g, '');
+    
+    // Nigerian local format (0XXXXXXXXXX)
+    if (/^0\d{10}$/.test(cleanPhone)) {
+      return `${cleanPhone.slice(0, 4)} ${cleanPhone.slice(4, 7)} ${cleanPhone.slice(7)}`;
+    }
+    
+    // International format (+234XXXXXXXXXX)
+    if (/^\+234\d{10}$/.test(cleanPhone)) {
+      return `+234 ${cleanPhone.slice(4, 7)} ${cleanPhone.slice(7, 10)} ${cleanPhone.slice(10)}`;
+    }
+    
+    // Try to parse with libphonenumber as fallback
     try {
       if (value && value.length > 3) {
-        const phoneNumber = parsePhoneNumber(value, 'US');
+        const phoneNumber = parsePhoneNumber(value, 'NG'); // Changed to Nigeria
         if (phoneNumber) {
-          return phoneNumber.formatNational();
+          return phoneNumber.formatInternational();
         }
       }
     } catch {
@@ -312,7 +328,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                     ? 'border-red-400 bg-red-50' 
                     : 'border-neutral-300 focus:border-green-500 bg-white'
                 } rounded-lg text-neutral-900 placeholder-neutral-400 transition-all duration-150 focus:outline-none focus:ring-0 focus:shadow-soft`}
-                placeholder="+1 (555) 123-4567"
+                placeholder="08012345678 or +2348012345678"
                 disabled={isLoading}
               />
               {!errors.phone && (
