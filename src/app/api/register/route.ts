@@ -10,6 +10,8 @@ import {
   runTransaction,
   orderBy,
   where,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from 'firebase/firestore';
 import type { Table, Attendee } from '@/types';
 import { TOTAL_TABLES, SEATS_PER_TABLE, TABLE_NAMES } from '@/types';
@@ -96,7 +98,7 @@ function calculateGenderBalanceScore(attendees: Attendee[], newGender: string) {
 }
 
 // Smart table selection with TRUE randomization and gender balancing
-function selectBestTable(availableTables: Array<{ doc: any; data: Table }>, newGender: string) {
+function selectBestTable(availableTables: Array<{ doc: QueryDocumentSnapshot<DocumentData>; data: Table }>, newGender: string) {
   if (availableTables.length === 0) {
     throw new Error('No available tables');
   }
