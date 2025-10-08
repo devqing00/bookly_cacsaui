@@ -59,19 +59,17 @@ export async function GET() {
     querySnapshot.forEach((doc) => {
       const tableData = doc.data() as Table;
       tableData.attendees.forEach((attendee, index) => {
-        if (!attendee.deleted) {
-          allAttendees.push({
-            tableId: doc.id,
-            tableNumber: tableData.tableNumber,
-            seatNumber: index + 1,
-            name: attendee.name,
-            email: attendee.email,
-            phone: attendee.phone,
-            gender: attendee.gender,
-            checkedIn: attendee.checkedIn,
-            checkedInAt: attendee.checkedInAt?.toString(),
-          });
-        }
+        allAttendees.push({
+          tableId: doc.id,
+          tableNumber: tableData.tableNumber,
+          seatNumber: index + 1,
+          name: attendee.name,
+          email: attendee.email,
+          phone: attendee.phone,
+          gender: attendee.gender,
+          checkedIn: attendee.checkedIn,
+          checkedInAt: attendee.checkedInAt?.toString(),
+        });
       });
     });
 
@@ -193,7 +191,7 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE - Soft delete user
+// DELETE - Permanently delete user
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -211,7 +209,7 @@ export async function DELETE(request: Request) {
 
     const seatIdx = parseInt(seatIndex);
 
-    // Soft delete: Mark as deleted instead of removing
+    // Permanently delete: Remove the attendee from the array
     const result = await runTransaction(db, async (transaction) => {
       const tableRef = doc(db, TABLES_COLLECTION, tableId);
       console.log('Attempting to get table with ID:', tableId, 'from collection:', TABLES_COLLECTION);
@@ -230,19 +228,21 @@ export async function DELETE(request: Request) {
         throw new Error('Attendee not found');
       }
 
-      // Mark as deleted
-      updatedAttendees[seatIdx].deleted = true;
-      updatedAttendees[seatIdx].deletedAt = new Date();
+      // Store deleted attendee info before removing
+      const deletedAttendee = updatedAttendees[seatIdx];
+
+      // Permanently remove the attendee from the array
+      updatedAttendees.splice(seatIdx, 1);
 
       transaction.update(tableRef, {
         attendees: updatedAttendees,
-        seat_count: tableData.attendees.filter(a => !a.deleted).length - 1,
+        seat_count: updatedAttendees.length,
       });
 
       return {
         success: true,
-        message: 'Attendee deleted successfully',
-        deletedAttendee: updatedAttendees[seatIdx],
+        message: 'Attendee permanently deleted',
+        deletedAttendee,
       };
     });
 

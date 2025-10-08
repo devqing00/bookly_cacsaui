@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import type { Table, AdminStats } from '@/types';
+import { TABLE_NAMES } from '@/types';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import EditUserModal from '@/components/EditUserModal';
@@ -26,7 +27,6 @@ function AdminPageContent() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'full'>('all');
   const [editUser, setEditUser] = useState<Table | null>(null);
   const [deleteUser, setDeleteUser] = useState<{ table: Table; seatIndex: number } | null>(null);
-  const [showDeleted, setShowDeleted] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalTables: 0,
@@ -35,7 +35,6 @@ function AdminPageContent() {
     fullTables: 0,
     availableSeats: 0,
     checkedInCount: 0,
-    deletedCount: 0,
   });
 
   // Check for existing session on mount
@@ -92,10 +91,15 @@ function AdminPageContent() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const tablesData = snapshot.docs.map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-        } as Table & { id: string }));
+        const tablesData = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            ...data,
+            id: doc.id,
+            // Ensure tableName is populated from TABLE_NAMES if missing
+            tableName: data.tableName || TABLE_NAMES[data.tableNumber] || `Table ${data.tableNumber}`,
+          } as Table & { id: string };
+        });
 
         setTables(tablesData);
         setLoading(false);
@@ -124,29 +128,34 @@ function AdminPageContent() {
 
   // Calculate statistics
   useEffect(() => {
+    // Filter to only tables with attendees
+    const tablesWithAttendees = tables.filter(t => t.attendees.length > 0);
+    
     const totalAttendees = tables.reduce((sum, table) => 
-      sum + table.attendees.filter(a => !a.deleted).length, 0
+      sum + table.attendees.length, 0
     );
-    const deletedCount = tables.reduce((sum, table) => 
-      sum + table.attendees.filter(a => a.deleted).length, 0
-    );
-    // Calculate full tables based on actual seat count
-    const fullTables = tables.filter(t => {
-      const actualSeats = t.attendees.filter(a => !a.deleted).length;
+    
+    // Calculate full tables based on actual seat count (only count tables with attendees)
+    const fullTables = tablesWithAttendees.filter(t => {
+      const actualSeats = t.attendees.length;
       return actualSeats >= t.maxCapacity;
     }).length;
+    
     const totalSeats = tables.reduce((sum, table) => sum + table.maxCapacity, 0);
     const availableSeats = totalSeats - totalAttendees;
-    const avgCapacity = tables.length > 0 ? (totalAttendees / tables.length) : 0;
+    
+    // Calculate average capacity only for tables with attendees
+    const avgCapacity = tablesWithAttendees.length > 0 
+      ? (totalAttendees / tablesWithAttendees.length) 
+      : 0;
 
     setStats({
-      totalTables: tables.length,
+      totalTables: tablesWithAttendees.length, // Only count tables with attendees
       totalAttendees,
       averageTableCapacity: avgCapacity,
       fullTables,
       availableSeats,
       checkedInCount: 0, // Will be implemented with check-in system
-      deletedCount,
     });
   }, [tables]);
 
@@ -154,56 +163,52 @@ function AdminPageContent() {
   useEffect(() => {
     let filtered = [...tables];
 
+    // Filter out empty tables (tables with no attendees)
+    filtered = filtered.filter(t => t.attendees.length > 0);
+
     // Apply status filter
     if (filterStatus === 'available') {
       filtered = filtered.filter(t => {
-        const actualSeats = t.attendees.filter(a => !a.deleted).length;
+        const actualSeats = t.attendees.length;
         return actualSeats < t.maxCapacity;
       });
     } else if (filterStatus === 'full') {
       filtered = filtered.filter(t => {
-        const actualSeats = t.attendees.filter(a => !a.deleted).length;
+        const actualSeats = t.attendees.length;
         return actualSeats >= t.maxCapacity;
       });
     }
 
-    // Apply search query
+    // Apply search filter
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(table =>
-        table.attendees.some(
-          attendee =>
-            (!showDeleted && attendee.deleted) ||
-            attendee.name.toLowerCase().includes(query) ||
-            attendee.email.toLowerCase().includes(query) ||
-            (attendee.phone && attendee.phone.toLowerCase().includes(query))
-        ) ||
-        table.tableNumber.toString().includes(query)
-      );
+      filtered = filtered.map(table => ({
+        ...table,
+        attendees: table.attendees.filter(attendee =>
+          attendee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          attendee.email.toLowerCase().includes(searchQuery.toLowerCase())
+        ),
+      })).filter(table => table.attendees.length > 0);
     }
 
     setFilteredTables(filtered);
-  }, [tables, searchQuery, filterStatus, showDeleted]);
+  }, [tables, searchQuery, filterStatus]);
 
   // Export to CSV
   const exportToCSV = () => {
     const csvRows = [];
-    csvRows.push(['Table', 'Seat', 'Name', 'Email', 'Phone', 'Gender', 'Registered At', 'Status']);
+    csvRows.push(['Table', 'Seat', 'Name', 'Email', 'Phone', 'Gender', 'Registered At']);
 
     tables.forEach(table => {
       table.attendees.forEach((attendee, index) => {
-        if (!attendee.deleted || showDeleted) {
-          csvRows.push([
-            table.tableNumber,
-            index + 1,
-            attendee.name,
-            attendee.email,
-            attendee.phone || 'N/A',
-            attendee.gender || 'N/A',
-            attendee.registeredAt ? new Date(attendee.registeredAt).toLocaleString() : 'N/A',
-            attendee.deleted ? 'Deleted' : 'Active',
-          ]);
-        }
+        csvRows.push([
+          table.tableNumber,
+          index + 1,
+          attendee.name,
+          attendee.email,
+          attendee.phone || 'N/A',
+          attendee.gender || 'N/A',
+          attendee.registeredAt ? new Date(attendee.registeredAt).toLocaleString() : 'N/A',
+        ]);
       });
     });
 
@@ -237,52 +242,6 @@ function AdminPageContent() {
     });
   };
 
-  // Restore user handler
-  const handleRestoreClick = async (table: Table & { id: string }, attendeeIndex: number) => {
-    const tableId = table.id; // Use Firestore document ID
-    const attendee = table.attendees[attendeeIndex];
-    
-    try {
-      const response = await fetch('/api/admin/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tableId,
-          seatIndex: attendeeIndex,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success('User restored successfully!');
-        
-        // Log the restore activity
-        try {
-          await fetch('/api/activity-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'restore',
-              attendeeName: attendee.name,
-              attendeeEmail: attendee.email,
-              tableNumber: table.tableNumber,
-              seatNumber: attendeeIndex + 1,
-              details: 'Restored deleted user',
-            }),
-          });
-        } catch (logError) {
-          console.error('Failed to log activity:', logError);
-        }
-      } else {
-        toast.error(data.error || 'Failed to restore user');
-      }
-    } catch (error) {
-      console.error('Error restoring user:', error);
-      toast.error('An error occurred while restoring user');
-    }
-  };
-
   // Refresh data after modal actions
   const refreshData = () => {
     // Data will auto-refresh due to real-time listener
@@ -298,6 +257,7 @@ function AdminPageContent() {
       phone: attendee.phone,
       gender: attendee.gender,
       tableNumber: table.tableNumber,
+      tableName: table.tableName,
       seatNumber: attendeeIndex + 1,
     };
 
@@ -315,13 +275,13 @@ function AdminPageContent() {
   // Print all badges for a table
   const handlePrintTableBadges = async (table: Table) => {
     const badges: BadgeData[] = table.attendees
-      .filter(a => !a.deleted)
       .map((attendee, index) => ({
         name: attendee.name,
         email: attendee.email,
         phone: attendee.phone,
         gender: attendee.gender,
         tableNumber: table.tableNumber,
+        tableName: table.tableName,
         seatNumber: index + 1,
       }));
 
@@ -342,16 +302,15 @@ function AdminPageContent() {
     
     tables.forEach(table => {
       table.attendees.forEach((attendee, index) => {
-        if (!attendee.deleted) {
-          allBadges.push({
-            name: attendee.name,
-            email: attendee.email,
-            phone: attendee.phone,
-            gender: attendee.gender,
-            tableNumber: table.tableNumber,
-            seatNumber: index + 1,
-          });
-        }
+        allBadges.push({
+          name: attendee.name,
+          email: attendee.email,
+          phone: attendee.phone,
+          gender: attendee.gender,
+          tableNumber: table.tableNumber,
+          tableName: table.tableName,
+          seatNumber: index + 1,
+        });
       });
     });
 
@@ -398,7 +357,7 @@ function AdminPageContent() {
           className="mb-12"
         >
           <div className="flex items-start gap-4 mb-6">
-            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-green">
+            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-burgundy-700 to-burgundy-800 flex items-center justify-center shadow-burgundy">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
               </svg>
@@ -421,7 +380,7 @@ function AdminPageContent() {
               transition={{ delay: 0.1 }}
               className="bg-white border border-neutral-200 rounded-lg sm:rounded-xl px-4 sm:px-6 py-3 sm:py-4 shadow-soft relative overflow-hidden group hover:shadow-medium transition-shadow"
             >
-              <div className="absolute top-0 right-0 w-16 sm:w-20 h-16 sm:h-20 bg-green-50 rounded-full -translate-y-8 sm:-translate-y-10 translate-x-8 sm:translate-x-10 opacity-40 group-hover:opacity-60 transition-opacity"></div>
+              <div className="absolute top-0 right-0 w-16 sm:w-20 h-16 sm:h-20 bg-golden-50 rounded-full -translate-y-8 sm:-translate-y-10 translate-x-8 sm:translate-x-10 opacity-40 group-hover:opacity-60 transition-opacity"></div>
               <p className="text-[10px] sm:text-xs font-medium text-neutral-500 mb-1 uppercase tracking-widest relative z-10">Tables</p>
               <p className="text-2xl sm:text-3xl font-bold text-neutral-900 relative z-10">{stats.totalTables}</p>
             </motion.div>
@@ -465,7 +424,7 @@ function AdminPageContent() {
               transition={{ delay: 0.3 }}
               className="bg-white border border-neutral-200 rounded-lg sm:rounded-xl px-4 sm:px-6 py-3 sm:py-4 shadow-soft relative overflow-hidden group hover:shadow-medium transition-shadow"
             >
-              <div className="absolute top-0 right-0 w-16 sm:w-20 h-16 sm:h-20 bg-green-50 rounded-full -translate-y-8 sm:-translate-y-10 translate-x-8 sm:translate-x-10 opacity-40 group-hover:opacity-60 transition-opacity"></div>
+              <div className="absolute top-0 right-0 w-16 sm:w-20 h-16 sm:h-20 bg-burgundy-50 rounded-full -translate-y-8 sm:-translate-y-10 translate-x-8 sm:translate-x-10 opacity-40 group-hover:opacity-60 transition-opacity"></div>
               <p className="text-[10px] sm:text-xs font-medium text-neutral-500 mb-1 uppercase tracking-widest relative z-10">Available</p>
               <p className="text-2xl sm:text-3xl font-bold text-neutral-900 relative z-10">{stats.availableSeats}</p>
             </motion.div>
@@ -491,7 +450,7 @@ function AdminPageContent() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, email, or table number..."
-                className="w-full px-4 py-2.5 pl-10 border border-neutral-300 rounded-lg focus:border-green-500 focus:ring-0 focus:outline-none transition-all"
+                className="w-full px-4 py-2.5 pl-10 border border-neutral-300 rounded-lg focus:border-golden-500 focus:ring-0 focus:outline-none transition-all"
               />
               <svg className="w-5 h-5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -505,26 +464,13 @@ function AdminPageContent() {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as 'all' | 'available' | 'full')}
-                  className="flex-1 sm:flex-initial min-w-[120px] px-3 py-2.5 border border-neutral-300 rounded-lg focus:border-green-500 focus:ring-0 focus:outline-none transition-all bg-white text-sm"
+                  className="flex-1 sm:flex-initial min-w-[120px] px-3 py-2.5 border border-neutral-300 rounded-lg focus:border-golden-500 focus:ring-0 focus:outline-none transition-all bg-white text-sm"
                   aria-label="Filter tables by status"
                 >
                   <option value="all">All Tables</option>
                   <option value="available">Available</option>
                   <option value="full">Full</option>
                 </select>
-
-                <button
-                  onClick={() => setShowDeleted(!showDeleted)}
-                  className={`flex-1 sm:flex-initial px-3 py-2.5 border border-neutral-300 rounded-lg transition-all text-xs sm:text-sm font-medium whitespace-nowrap ${
-                    showDeleted 
-                      ? 'bg-amber-50 border-amber-300 text-amber-700' 
-                      : 'bg-white text-neutral-700 hover:bg-neutral-50'
-                  }`}
-                  aria-label="Toggle deleted users"
-                >
-                  <span className="hidden sm:inline">{showDeleted ? '👁️ Hiding Deleted' : '👁️‍🗨️ Show Deleted'}</span>
-                  <span className="sm:hidden">{showDeleted ? '👁️ Hide' : '👁️‍🗨️ Show'}</span>
-                </button>
 
                 <Link
                   href="/check-registration"
@@ -581,7 +527,7 @@ function AdminPageContent() {
                 <button
                   onClick={exportToCSV}
                   disabled={tables.length === 0}
-                  className="flex-1 sm:flex-initial bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-lg shadow-green transition-all duration-150 active:shadow-none active:translate-y-0.5 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="flex-1 sm:flex-initial bg-gradient-to-r from-burgundy-700 to-burgundy-800 hover:from-burgundy-800 hover:to-burgundy-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-lg shadow-burgundy transition-all duration-150 active:shadow-none active:translate-y-0.5 flex items-center justify-center gap-1.5 group disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                   title="Export to CSV"
                 >
                   <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -624,7 +570,7 @@ function AdminPageContent() {
             <AnimatePresence>
               {filteredTables.map((table: Table & { id: string }, index) => {
                 // Calculate actual seat count from non-deleted attendees
-                const actualSeatCount = table.attendees.filter((a) => !a.deleted).length;
+                const actualSeatCount = table.attendees.length;
                 
                 return (
               <motion.div
@@ -636,19 +582,20 @@ function AdminPageContent() {
                 className="bg-white border border-neutral-200 rounded-xl p-6 shadow-soft hover:shadow-medium transition-shadow relative overflow-hidden"
               >
                 {/* Decorative element */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -translate-y-16 translate-x-16 opacity-30"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-golden-50 rounded-full -translate-y-16 translate-x-16 opacity-30"></div>
                 
                 {/* Table Header */}
                 <div className="flex items-center justify-between mb-6 relative z-10">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white font-bold shadow-green">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-burgundy-700 to-burgundy-800 flex items-center justify-center text-white font-bold shadow-burgundy">
                       {table.tableNumber}
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-neutral-900">
-                        Table {table.tableNumber}
+                      <h2 className="text-lg font-bold text-burgundy-700 leading-tight">
+                        {table.tableName || `Table ${table.tableNumber}`}
                       </h2>
-                      {table.attendees.filter((a) => !a.deleted).length > 0 && (
+                      <p className="text-xs text-neutral-500 mt-0.5">Table {table.tableNumber}</p>
+                      {table.attendees.length > 0 && (
                         <button
                           onClick={() => handlePrintTableBadges(table)}
                           className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-1"
@@ -666,7 +613,7 @@ function AdminPageContent() {
                       ? 'bg-red-100 text-red-700' 
                       : actualSeatCount >= table.maxCapacity * 0.8
                       ? 'bg-amber-100 text-amber-700'
-                      : 'bg-green-100 text-green-700'
+                      : 'bg-golden-100 text-burgundy-700'
                   }`}>
                     {actualSeatCount}/{table.maxCapacity}
                   </div>
@@ -683,7 +630,7 @@ function AdminPageContent() {
                         ? 'bg-gradient-to-r from-red-600 to-red-500'
                         : actualSeatCount >= table.maxCapacity * 0.8
                         ? 'bg-gradient-to-r from-amber-600 to-amber-500'
-                        : 'bg-gradient-to-r from-green-600 to-green-500'
+                        : 'bg-gradient-to-r from-burgundy-700 to-burgundy-800'
                     }`}
                   ></motion.div>
                 </div>
@@ -708,18 +655,18 @@ function AdminPageContent() {
                       className={`border-l-2 ${
                         attendee.deleted 
                           ? 'border-gray-400 bg-gray-50 opacity-70' 
-                          : 'border-green-400 bg-white'
-                      } pl-3 py-2 hover:bg-green-50/50 transition-colors rounded-r`}
+                          : 'border-golden-400 bg-white'
+                      } pl-3 py-2 hover:bg-golden-50/50 transition-colors rounded-r`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                            <p className={`text-sm font-medium text-neutral-900 ${attendee.deleted ? 'line-through' : ''}`}>
+                            <p className="text-sm font-medium text-neutral-900">
                               {attendee.name}
                             </p>
                             <span className="text-xs text-neutral-500">#{idx + 1}</span>
                             {attendee.checkedIn && (
-                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full flex items-center gap-1">
+                              <span className="text-xs px-1.5 py-0.5 bg-golden-100 text-burgundy-700 rounded-full flex items-center gap-1">
                                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
@@ -731,17 +678,12 @@ function AdminPageContent() {
                                 {attendee.gender}
                               </span>
                             )}
-                            {attendee.deleted && (
-                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full">
-                                Deleted
-                              </span>
-                            )}
                           </div>
-                          <p className={`text-xs text-neutral-600 ${attendee.deleted ? 'line-through' : ''}`}>
+                          <p className="text-xs text-neutral-600">
                             {attendee.email}
                           </p>
                           {attendee.phone && (
-                            <p className={`text-xs text-neutral-500 mt-0.5 ${attendee.deleted ? 'line-through' : ''}`}>
+                            <p className="text-xs text-neutral-500 mt-0.5">
                               📱 {attendee.phone}
                             </p>
                           )}
@@ -759,49 +701,36 @@ function AdminPageContent() {
                         
                         {/* Action buttons */}
                         <div className="flex items-center gap-1">
-                          {!attendee.deleted ? (
-                            <>
-                              <button
-                                onClick={() => handlePrintBadge(table, idx)}
-                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                                aria-label="Print badge"
-                                title="Print badge"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleEditClick(table, idx)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                aria-label="Edit user"
-                                title="Edit user details"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteClick(table, idx)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                aria-label="Delete user"
-                                title="Delete user"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => handleRestoreClick(table, idx)}
-                              className="px-2 py-1 text-xs text-green-600 hover:bg-green-50 border border-green-300 rounded transition-colors"
-                              aria-label="Restore user"
-                              title="Restore user"
-                            >
-                              Restore
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handlePrintBadge(table, idx)}
+                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                            aria-label="Print badge"
+                            title="Print badge"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleEditClick(table, idx)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            aria-label="Edit user"
+                            title="Edit user details"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(table, idx)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            aria-label="Delete user"
+                            title="Delete user"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -868,7 +797,7 @@ function AdminPageContent() {
         <div className="mt-12 pt-8 border-t border-neutral-200">
           <Link
             href="/"
-            className="text-sm font-medium text-neutral-700 hover:text-green-700 transition-colors duration-150 inline-flex items-center gap-2 group"
+            className="text-sm font-medium text-neutral-700 hover:text-burgundy-700 transition-colors duration-150 inline-flex items-center gap-2 group"
           >
             <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />

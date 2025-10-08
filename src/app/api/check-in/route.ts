@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       const attendees = tableData.attendees || [];
 
       const index = attendees.findIndex(
-        (a: { email: string; deleted?: boolean }) => a.email.toLowerCase() === email.toLowerCase() && !a.deleted
+        (a: { email: string }) => a.email.toLowerCase() === email.toLowerCase()
       );
 
       if (index !== -1) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     if (!foundAttendee) {
       return NextResponse.json(
-        { success: false, error: 'Registration not found or has been deleted' },
+        { success: false, error: 'Registration not found' },
         { status: 404 }
       );
     }
@@ -108,15 +108,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Check-in successful!',
-      attendee: {
-        name: foundAttendee.name,
-        email: foundAttendee.email,
-        phone: foundAttendee.phone,
-        gender: foundAttendee.gender,
-        tableNumber: currentTable.tableNumber,
-        seatNumber: attendeeIndex + 1,
-        checkedInAt: new Date().toISOString(),
-      },
+      name: foundAttendee.name,
+      email: foundAttendee.email,
+      phone: foundAttendee.phone,
+      gender: foundAttendee.gender,
+      tableNumber: currentTable.tableNumber,
+      tableName: currentTable.tableName,
+      seatNumber: attendeeIndex + 1,
+      checkedInAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Check-in error:', error);
@@ -153,7 +152,7 @@ export async function GET(request: NextRequest) {
       const attendees = table.attendees || [];
 
       const index = attendees.findIndex(
-        (a: { email: string; deleted?: boolean }) => a.email.toLowerCase() === email.toLowerCase() && !a.deleted
+        (a: { email: string }) => a.email.toLowerCase() === email.toLowerCase()
       );
 
       if (index !== -1) {
@@ -181,6 +180,7 @@ export async function GET(request: NextRequest) {
         phone: foundAttendee.phone,
         gender: foundAttendee.gender,
         tableNumber: tableData?.tableNumber || 0,
+        tableName: tableData?.tableName,
         seatNumber,
       },
     });

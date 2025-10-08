@@ -72,7 +72,7 @@ export default function LoginModal({ isOpen, onLogin }: LoginModalProps) {
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
             >
               {/* Header */}
-              <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-8 text-white">
+              <div className="bg-gradient-to-r from-burgundy-700 to-burgundy-800 px-6 py-8 text-white">
                 <div className="flex items-center justify-center mb-3">
                   <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
                     <svg
@@ -92,7 +92,7 @@ export default function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold text-center">Admin Login</h2>
-                <p className="text-green-100 text-center mt-2 text-sm">
+                <p className="text-golden-100 text-center mt-2 text-sm">
                   Enter your password to access the admin dashboard
                 </p>
               </div>
@@ -193,7 +193,7 @@ export default function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-burgundy-700 to-burgundy-800 text-white py-3 rounded-lg font-semibold hover:from-burgundy-800 hover:to-burgundy-900 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>

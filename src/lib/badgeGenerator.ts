@@ -7,6 +7,7 @@ export interface BadgeData {
   phone?: string;
   gender?: string;
   tableNumber: number;
+  tableName?: string;
   seatNumber: number;
 }
 
@@ -17,246 +18,340 @@ export async function generateBadgePDF(attendee: BadgeData): Promise<Blob> {
     format: [100, 150], // Badge size: 100mm x 150mm
   });
 
-  // Generate QR code with improved data structure and green color
+  // Generate QR code with burgundy color
   const qrDataUrl = await QRCode.toDataURL(
     JSON.stringify({
       name: attendee.name,
       email: attendee.email,
       phone: attendee.phone || '',
       table: attendee.tableNumber,
+      tableName: attendee.tableName || '',
       seat: attendee.seatNumber,
       event: 'CACSAUI Love Feast'
     }),
-    { width: 300, margin: 1, color: { dark: '#166534', light: '#ffffff' } }
+    { width: 300, margin: 1, color: { dark: '#5C2A2A', light: '#ffffff' } }
   );
 
-  // Soft gradient background
-  pdf.setFillColor(248, 250, 252); // slate-50
+  // Background - soft golden tint
+  pdf.setFillColor(254, 252, 243); // golden-50
   pdf.rect(0, 0, 100, 150, 'F');
 
-  // Top accent bar - Green gradient simulation
-  pdf.setFillColor(34, 197, 94); // green-500
-  pdf.rect(0, 0, 100, 3, 'F');
-
-  // Header section with rounded corners effect
-  pdf.setFillColor(255, 255, 255);
-  pdf.roundedRect(5, 8, 90, 35, 3, 3, 'F');
+  // Top accent bar - burgundy gradient
+  pdf.setFillColor(92, 42, 42); // burgundy-700
+  pdf.rect(0, 0, 100, 4, 'F');
   
-  // Add shadow effect with gray border
-  pdf.setDrawColor(226, 232, 240); // slate-200
-  pdf.setLineWidth(0.3);
-  pdf.roundedRect(5, 8, 90, 35, 3, 3, 'S');
+  // Golden accent bar below
+  pdf.setFillColor(212, 162, 68); // golden-500
+  pdf.rect(0, 4, 100, 1, 'F');
+
+  // Event Header Section
+  pdf.setFillColor(255, 255, 255);
+  pdf.roundedRect(5, 10, 90, 30, 3, 3, 'F');
+  
+  pdf.setDrawColor(212, 162, 68); // golden-500 border
+  pdf.setLineWidth(0.4);
+  pdf.roundedRect(5, 10, 90, 30, 3, 3, 'S');
 
   // Event Logo/Title
-  pdf.setTextColor(34, 197, 94); // green-500
+  pdf.setTextColor(92, 42, 42); // burgundy-700
   pdf.setFontSize(18);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('CACSAUI', 50, 18, { align: 'center' });
+  pdf.text('CACSAUI', 50, 19, { align: 'center' });
   
-  pdf.setFontSize(16);
+  pdf.setFontSize(15);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('Love Feast', 50, 26, { align: 'center' });
+  pdf.text('Love Feast 2025', 50, 27, { align: 'center' });
 
-  pdf.setFontSize(10);
-  pdf.setTextColor(100, 116, 139); // slate-500
-  pdf.text('University of Ibadan', 50, 32, { align: 'center' });
+  pdf.setFontSize(9);
+  pdf.setTextColor(120, 113, 108); // neutral-500
+  pdf.text('University of Ibadan', 50, 34, { align: 'center' });
 
   // Decorative line
-  pdf.setDrawColor(34, 197, 94);
-  pdf.setLineWidth(0.5);
-  pdf.line(25, 37, 75, 37);
+  pdf.setDrawColor(212, 162, 68); // golden-500
+  pdf.setLineWidth(0.6);
+  pdf.line(20, 37, 80, 37);
 
-  // Attendee Name Section with background
-  pdf.setFillColor(254, 252, 232); // yellow-50
-  pdf.roundedRect(5, 48, 90, 18, 2, 2, 'F');
+  // Attendee Name Section
+  pdf.setFillColor(253, 246, 226); // golden-100
+  pdf.roundedRect(5, 45, 90, 20, 2, 2, 'F');
   
-  pdf.setDrawColor(250, 204, 21); // yellow-400
-  pdf.setLineWidth(0.2);
-  pdf.roundedRect(5, 48, 90, 18, 2, 2, 'S');
+  pdf.setDrawColor(212, 162, 68); // golden-500
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(5, 45, 90, 20, 2, 2, 'S');
 
-  pdf.setFontSize(8);
-  pdf.setTextColor(161, 98, 7); // yellow-800
+  pdf.setFontSize(7);
+  pdf.setTextColor(92, 42, 42); // burgundy-700
   pdf.setFont('helvetica', 'bold');
-  pdf.text('ATTENDEE', 50, 53, { align: 'center' });
+  pdf.text('ATTENDEE', 50, 50, { align: 'center' });
 
-  // Name - handle long names with wrapping
-  pdf.setFontSize(14);
-  pdf.setTextColor(17, 24, 39); // gray-900
+  // Name - handle long names
+  pdf.setFontSize(13);
+  pdf.setTextColor(23, 23, 23); // neutral-900
   pdf.setFont('helvetica', 'bold');
   const nameLines = pdf.splitTextToSize(attendee.name, 85);
-  const nameY = nameLines.length > 1 ? 59 : 61;
+  const nameY = nameLines.length > 1 ? 56 : 59;
   pdf.text(nameLines, 50, nameY, { align: 'center', maxWidth: 85 });
 
-  // Table and Seat Assignment - Prominent Display
-  const assignmentY = 73;
+  // Table Assignment Card - Main Feature
+  const cardY = 70;
   
-  // Table Number Box
-  pdf.setFillColor(34, 197, 94); // green-500
-  pdf.roundedRect(15, assignmentY, 30, 25, 2, 2, 'F');
+  // Card background with gradient effect
+  pdf.setFillColor(253, 246, 226); // golden-100
+  pdf.roundedRect(5, cardY, 90, 48, 3, 3, 'F');
   
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('TABLE', 30, assignmentY + 6, { align: 'center' });
-  
-  pdf.setFontSize(24);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(attendee.tableNumber.toString(), 30, assignmentY + 18, { align: 'center' });
+  // Border - golden
+  pdf.setDrawColor(212, 162, 68); // golden-500
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(5, cardY, 90, 48, 3, 3, 'S');
 
-  // Seat Number Box
-  pdf.setFillColor(59, 130, 246); // blue-500
-  pdf.roundedRect(55, assignmentY, 30, 25, 2, 2, 'F');
-  
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('SEAT', 70, assignmentY + 6, { align: 'center' });
-  
-  pdf.setFontSize(24);
+  // Table Name Header
+  pdf.setFontSize(6);
+  pdf.setTextColor(92, 42, 42); // burgundy-700
   pdf.setFont('helvetica', 'bold');
-  pdf.text(attendee.seatNumber.toString(), 70, assignmentY + 18, { align: 'center' });
+  pdf.text('YOUR ASSIGNED TABLE', 50, cardY + 5, { align: 'center' });
 
-  // QR Code Section with border
-  const qrY = 105;
-  pdf.setFillColor(255, 255, 255);
-  pdf.roundedRect(25, qrY, 50, 50, 2, 2, 'F');
-  
-  pdf.setDrawColor(226, 232, 240);
+  // Table Name - wrap if too long
+  pdf.setFontSize(11);
+  pdf.setTextColor(74, 31, 31); // burgundy-800
+  pdf.setFont('helvetica', 'bold');
+  const tableName = attendee.tableName || `Table ${attendee.tableNumber}`;
+  const tableNameLines = pdf.splitTextToSize(tableName, 85);
+  const tableNameY = cardY + (tableNameLines.length > 1 ? 11 : 12);
+  pdf.text(tableNameLines, 50, tableNameY, { align: 'center', maxWidth: 85 });
+
+  // Divider line
+  const dividerY = cardY + (tableNameLines.length > 1 ? 20 : 18);
+  pdf.setDrawColor(212, 162, 68); // golden-500
   pdf.setLineWidth(0.3);
-  pdf.roundedRect(25, qrY, 50, 50, 2, 2, 'S');
+  pdf.line(15, dividerY, 85, dividerY);
+
+  // Table Number and Seat - Side by side
+  const numbersY = dividerY + 7;
+  
+  // Table Number (Left)
+  pdf.setFontSize(6);
+  pdf.setTextColor(92, 42, 42); // burgundy-700
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('TABLE NUMBER', 30, numbersY, { align: 'center' });
+  
+  pdf.setFontSize(28);
+  pdf.setTextColor(92, 42, 42); // burgundy-700
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(attendee.tableNumber.toString(), 30, numbersY + 12, { align: 'center' });
+
+  // Seat Number (Right)
+  pdf.setFontSize(6);
+  pdf.setTextColor(92, 42, 42); // burgundy-700
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('SEAT', 70, numbersY, { align: 'center' });
+  
+  pdf.setFontSize(22);
+  pdf.setTextColor(92, 42, 42); // burgundy-700
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(attendee.seatNumber.toString(), 70, numbersY + 11, { align: 'center' });
+
+  // Seat indicator dots
+  const dotsY = cardY + 43;
+  const dotStartX = 18;
+  const dotSpacing = 9;
+  
+  for (let i = 0; i < 8; i++) {
+    if (i < attendee.seatNumber) {
+      pdf.setFillColor(212, 162, 68); // golden-500 - filled
+    } else {
+      pdf.setFillColor(229, 231, 235); // neutral-200 - empty
+    }
+    pdf.circle(dotStartX + (i * dotSpacing), dotsY, 1.5, 'F');
+  }
+
+  // QR Code Section
+  const qrY = 124;
+  pdf.setFillColor(255, 255, 255);
+  pdf.roundedRect(30, qrY, 40, 40, 2, 2, 'F');
+  
+  pdf.setDrawColor(212, 162, 68); // golden-500
+  pdf.setLineWidth(0.4);
+  pdf.roundedRect(30, qrY, 40, 40, 2, 2, 'S');
   
   // Add QR code
-  pdf.addImage(qrDataUrl, 'PNG', 30, qrY + 5, 40, 40);
+  pdf.addImage(qrDataUrl, 'PNG', 33, qrY + 3, 34, 34);
 
-  // Instructions text
-  pdf.setFontSize(7);
-  pdf.setTextColor(100, 116, 139); // slate-500
+  // QR Instructions
+  pdf.setFontSize(6);
+  pdf.setTextColor(120, 113, 108); // neutral-500
   pdf.setFont('helvetica', 'italic');
-  pdf.text('Scan at entrance for quick check-in', 50, 161, { align: 'center' });
+  pdf.text('Show this QR code at check-in', 50, 168, { align: 'center' });
 
   // Footer decoration
-  pdf.setDrawColor(34, 197, 94);
+  pdf.setDrawColor(212, 162, 68); // golden-500
   pdf.setLineWidth(0.3);
-  pdf.line(20, 167, 80, 167);
+  pdf.line(25, 171, 75, 171);
 
-  // Additional info in footer
-  if (attendee.email || attendee.phone) {
-    pdf.setFontSize(6);
-    pdf.setTextColor(148, 163, 184); // slate-400
+  // Gender icon (small, subtle)
+  if (attendee.gender) {
+    pdf.setFontSize(5);
+    pdf.setTextColor(168, 162, 158); // neutral-400
     pdf.setFont('helvetica', 'normal');
-    let footerY = 171;
-    
-    if (attendee.email) {
-      const emailText = attendee.email.length > 35 ? attendee.email.substring(0, 32) + '...' : attendee.email;
-      pdf.text(emailText, 50, footerY, { align: 'center' });
-      footerY += 3;
-    }
-    
-    if (attendee.phone) {
-      pdf.text(attendee.phone, 50, footerY, { align: 'center' });
-    }
+    const genderText = attendee.gender === 'Male' ? 'M' : attendee.gender === 'Female' ? 'F' : 'O';
+    pdf.text(genderText, 8, 174);
   }
 
   return pdf.output('blob');
 }
 
+/**
+ * Generate a batch of badges in a single PDF
+ * Each badge appears on a separate page
+ */
 export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Blob> {
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a4',
+    format: [85.6, 54],
+    compress: true,
   });
 
-  const badgesPerPage = 4; // 2x2 grid on A4
-  const badgeWidth = 100;
-  const badgeHeight = 140;
-  const marginX = 5;
-  const marginY = 10;
-
   for (let i = 0; i < attendees.length; i++) {
-    const attendee = attendees[i];
-    
-    // Add new page if needed
-    if (i > 0 && i % badgesPerPage === 0) {
+    if (i > 0) {
       pdf.addPage();
     }
-
-    const positionIndex = i % badgesPerPage;
-    const col = positionIndex % 2;
-    const row = Math.floor(positionIndex / 2);
     
-    const xPos = marginX + col * (badgeWidth + marginX);
-    const yPos = marginY + row * (badgeHeight + marginY);
-
-    // Generate QR code
-    const qrDataUrl = await QRCode.toDataURL(
-      `Name: ${attendee.name}\nEmail: ${attendee.email}\nPhone: ${attendee.phone || 'N/A'}\nTable: ${attendee.tableNumber}\nSeat: ${attendee.seatNumber}`,
-      { width: 150, margin: 1 }
-    );
-
-    // Badge background
-    pdf.setFillColor(240, 253, 244);
-    pdf.rect(xPos, yPos, badgeWidth, badgeHeight, 'F');
-
-    // Border
-    pdf.setDrawColor(209, 213, 219);
-    pdf.setLineWidth(0.3);
-    pdf.rect(xPos, yPos, badgeWidth, badgeHeight, 'S');
-
-    // Header
-    pdf.setFillColor(34, 197, 94);
-    pdf.rect(xPos, yPos, badgeWidth, 22, 'F');
-
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CACSAUI Love Feast', xPos + badgeWidth / 2, yPos + 10, { align: 'center' });
+    const attendee = attendees[i];
     
+    // Background
+    pdf.setFillColor(254, 252, 243); // golden-50
+    pdf.rect(0, 0, 85.6, 54, 'F');
+
+    // Top burgundy bar
+    pdf.setFillColor(92, 42, 42); // burgundy-700
+    pdf.rect(0, 0, 85.6, 4, 'F');
+
+    // Secondary golden accent bar
+    pdf.setFillColor(212, 162, 68); // golden-500
+    pdf.rect(0, 4, 85.6, 1, 'F');
+
+    // CACSAUI Love Feast Title
     pdf.setFontSize(9);
+    pdf.setTextColor(92, 42, 42); // burgundy-700
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CACSAUI LOVE FEAST', 42.8, 10, { align: 'center' });
+
+    // Event Date
+    pdf.setFontSize(7);
+    pdf.setTextColor(113, 113, 122); // neutral-500
     pdf.setFont('helvetica', 'normal');
-    pdf.text('University of Ibadan', xPos + badgeWidth / 2, yPos + 16, { align: 'center' });
+    pdf.text('October 11, 2025', 42.8, 15, { align: 'center' });
 
     // Name
-    pdf.setTextColor(17, 24, 39);
-    pdf.setFontSize(12);
+    pdf.setFontSize(13);
+    pdf.setTextColor(23, 23, 23); // neutral-900
     pdf.setFont('helvetica', 'bold');
-    const nameLines = pdf.splitTextToSize(attendee.name, badgeWidth - 10);
-    pdf.text(nameLines, xPos + badgeWidth / 2, yPos + 32, { align: 'center', maxWidth: badgeWidth - 10 });
+    const nameLines = pdf.splitTextToSize(attendee.name || '', 72);
+    pdf.text(nameLines, 42.8, 22, { align: 'center' });
 
-    // Email
+    // Table Assignment Label
     pdf.setFontSize(7);
+    pdf.setTextColor(113, 113, 122); // neutral-500
     pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(75, 85, 99);
-    const emailLines = pdf.splitTextToSize(attendee.email, badgeWidth - 10);
-    pdf.text(emailLines, xPos + badgeWidth / 2, yPos + 40, { align: 'center', maxWidth: badgeWidth - 10 });
+    pdf.text('YOUR ASSIGNED TABLE', 42.8, 30, { align: 'center' });
 
-    // Table info
-    const infoYPos = yPos + 50;
-    pdf.setFillColor(239, 246, 255);
-    pdf.roundedRect(xPos + 10, infoYPos, badgeWidth - 20, 14, 2, 2, 'F');
+    // Table Name
+    if (attendee.tableName) {
+      pdf.setFontSize(11);
+      pdf.setTextColor(92, 42, 42); // burgundy-700
+      pdf.setFont('helvetica', 'bold');
+      const tableNameLines = pdf.splitTextToSize(attendee.tableName, 72);
+      pdf.text(tableNameLines, 42.8, 35, { align: 'center' });
+    }
+
+    // Table & Seat numbers side by side
+    const yPosition = attendee.tableName ? 42 : 37;
     
-    pdf.setTextColor(29, 78, 216);
-    pdf.setFontSize(10);
+    // Table Number
+    pdf.setFontSize(28);
+    pdf.setTextColor(92, 42, 42); // burgundy-700
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`Table ${attendee.tableNumber} • Seat ${attendee.seatNumber}`, xPos + badgeWidth / 2, infoYPos + 9, { align: 'center' });
+    pdf.text(`${attendee.tableNumber}`, 28, yPosition, { align: 'center' });
+    
+    pdf.setFontSize(8);
+    pdf.setTextColor(113, 113, 122); // neutral-500
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('TABLE', 28, yPosition + 5, { align: 'center' });
+
+    // Seat Number
+    pdf.setFontSize(22);
+    pdf.setTextColor(212, 162, 68); // golden-600
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${attendee.seatNumber}`, 57, yPosition, { align: 'center' });
+    
+    pdf.setFontSize(8);
+    pdf.setTextColor(113, 113, 122); // neutral-500
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('SEAT', 57, yPosition + 5, { align: 'center' });
+
+    // 8 Seat Indicator Dots
+    const dotY = 50;
+    const dotSpacing = 5;
+    const startX = 42.8 - (7 * dotSpacing) / 2;
+    
+    for (let j = 0; j < 8; j++) {
+      const x = startX + j * dotSpacing;
+      if (j + 1 === attendee.seatNumber) {
+        pdf.setFillColor(212, 162, 68); // golden-500 - active seat
+      } else {
+        pdf.setFillColor(229, 231, 235); // neutral-200 - inactive seat
+      }
+      pdf.circle(x, dotY, 1.5, 'F');
+    }
 
     // QR Code
-    pdf.addImage(qrDataUrl, 'PNG', xPos + 25, infoYPos + 18, 50, 50);
+    const qrData = JSON.stringify({
+      name: attendee.name,
+      email: attendee.email,
+      table: attendee.tableNumber,
+      seat: attendee.seatNumber,
+      phone: attendee.phone,
+      gender: attendee.gender,
+      event: 'CACSAUI Love Feast',
+    });
 
-    // Footer
-    pdf.setFontSize(6);
-    pdf.setTextColor(107, 114, 128);
-    pdf.text('Scan for check-in', xPos + badgeWidth / 2, infoYPos + 72, { align: 'center' });
+    try {
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, qrData, {
+        width: 200,
+        margin: 1,
+        color: {
+          dark: '#5C2A2A', // burgundy-700
+          light: '#FFFFFF',
+        },
+      });
+
+      const qrImageData = canvas.toDataURL('image/png');
+      pdf.addImage(qrImageData, 'PNG', 69, 6, 14, 14);
+    } catch (error) {
+      console.error('QR code generation error:', error);
+    }
+
+    // Gender indicator (optional)
+    if (attendee.gender) {
+      pdf.setFontSize(8);
+      pdf.setTextColor(113, 113, 122);
+      pdf.setFont('helvetica', 'bold');
+      const genderText = attendee.gender === 'Male' ? 'M' : attendee.gender === 'Female' ? 'F' : 'O';
+      pdf.text(genderText, 8, 174);
+    }
   }
 
   return pdf.output('blob');
 }
 
-export function downloadBadge(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
+export function downloadBadge(pdfBlob: Blob, filename: string) {
+  const url = URL.createObjectURL(pdfBlob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }

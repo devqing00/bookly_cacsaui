@@ -9,31 +9,57 @@ module.exports = {
     extend: {
       colors: {
         neutral: {
-          50: '#fafaf9',   // Warm off-white
-          100: '#f5f5f4',  // Lighter stone
-          150: '#eeeeec',  // Custom stone
-          200: '#e7e5e4',  // Stone border
-          300: '#d6d3d1',  // Medium stone
-          400: '#a8a29e',  // Muted stone
-          500: '#78716c',  // Mid stone
-          600: '#57534e',  // Dark stone
-          700: '#44403c',  // Deeper stone
-          800: '#292524',  // Rich charcoal
-          900: '#1c1917',  // Deep charcoal (not pure black)
-          950: '#0c0a09',  // Darkest charcoal
+          50: '#fefcf7',   // Warm cream
+          100: '#fdf9f0',  // Light cream
+          150: '#faf6e8',  // Custom cream
+          200: '#f5f0e0',  // Beige
+          300: '#e8dfc8',  // Warm beige
+          400: '#d9c3a9',  // Medium beige
+          500: '#b89968',  // Tan
+          600: '#997a4f',  // Warm tan
+          700: '#7a5f3e',  // Brown
+          800: '#5c4530',  // Deep brown
+          900: '#3d2e20',  // Rich brown
+          950: '#1c1917',  // Deep charcoal
         },
-        green: {
-          50: '#f0fdf5',   // Lightest mint
-          100: '#dcfce8',  // Light mint
-          200: '#bbf7d1',  // Soft green
-          300: '#86efac',  // Light green
-          400: '#4ade80',  // Fresh green
-          500: '#22c55e',  // Vibrant green (primary accent)
-          600: '#16a34a',  // Forest green
-          700: '#15803d',  // Deep green
-          800: '#166534',  // Dark forest
-          900: '#14532d',  // Deepest green
-          950: '#052e16',  // Nearly black green
+        golden: {
+          50: '#fcf7e8',   // Lightest golden
+          100: '#faf1d5',  // Light golden cream
+          200: '#f7e6ab',  // Soft golden
+          300: '#f3d881',  // Light golden
+          400: '#efc957',  // Bright golden
+          500: '#d4a244',  // Primary golden/mustard (from flyer)
+          600: '#b8862f',  // Deep golden
+          700: '#9c6d23',  // Darker golden
+          800: '#7d5619',  // Bronze
+          900: '#5e3f10',  // Deep bronze
+          950: '#3f2a08',  // Nearly black bronze
+        },
+        burgundy: {
+          50: '#fdf5f5',   // Lightest burgundy tint
+          100: '#fae8e8',  // Light burgundy
+          200: '#f3d1d1',  // Soft burgundy
+          300: '#e8b4b4',  // Light burgundy rose
+          400: '#d68888',  // Muted burgundy
+          500: '#a85050',  // Medium burgundy
+          600: '#8a3a3a',  // Rich burgundy
+          700: '#5c2a2a',  // Primary burgundy/maroon (from flyer)
+          800: '#4a1f1f',  // Dark burgundy (from flyer)
+          900: '#3a1616',  // Deepest burgundy
+          950: '#2a0f0f',  // Nearly black burgundy
+        },
+        red: {
+          50: '#fef2f2',   // Lightest red
+          100: '#fee2e2',  // Light red
+          200: '#fecaca',  // Soft red
+          300: '#fca5a5',  // Light red
+          400: '#f87171',  // Bright red
+          500: '#dc2626',  // Red accent (from heart balloons)
+          600: '#b91c1c',  // Deep red
+          700: '#991b1b',  // Darker red
+          800: '#7f1d1d',  // Dark red
+          900: '#651c1c',  // Deepest red
+          950: '#450a0a',  // Nearly black red
         },
       },
       fontSize: {

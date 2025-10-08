@@ -13,6 +13,7 @@ interface CheckInResult {
   phone?: string;
   gender?: string;
   tableNumber: number;
+  tableName?: string;
   seatNumber: number;
   checkedInAt: string;
 }
@@ -69,7 +70,7 @@ export default function CheckInPage() {
 
       if (data.success) {
         toast.success(`✅ ${data.name} checked in successfully!`, {
-          description: `Table ${data.tableNumber}, Seat ${data.seatNumber}`,
+          description: `${data.tableName || `Table ${data.tableNumber}`}, Seat ${data.seatNumber}`,
           duration: 5000,
         });
         
@@ -193,9 +194,9 @@ export default function CheckInPage() {
   // Show loading state while checking authentication
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-golden-50 to-burgundy-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-burgundy-700 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-neutral-600 font-medium">Verifying authentication...</p>
           <p className="text-neutral-500 text-sm mt-2">Redirecting to login if needed</p>
         </div>
@@ -204,7 +205,7 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-golden-50 to-burgundy-50">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <motion.div
@@ -234,7 +235,7 @@ export default function CheckInPage() {
             }}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
               mode === 'scanner'
-                ? 'bg-gradient-to-r from-green-600 to-green-500 text-white shadow-md'
+                ? 'bg-gradient-to-r from-burgundy-700 to-burgundy-800 text-white shadow-md'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -248,7 +249,7 @@ export default function CheckInPage() {
             }}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
               mode === 'manual'
-                ? 'bg-gradient-to-r from-green-600 to-green-500 text-white shadow-md'
+                ? 'bg-gradient-to-r from-burgundy-700 to-burgundy-800 text-white shadow-md'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -294,7 +295,7 @@ export default function CheckInPage() {
                   <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
                     <button
                       onClick={() => setScannerActive(true)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                      className="bg-burgundy-700 hover:bg-burgundy-800 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                     >
                       Start Scanner
                     </button>
@@ -302,8 +303,8 @@ export default function CheckInPage() {
                 )}
                 {scannerActive && (
                   <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute inset-0 border-4 border-green-500 opacity-50 animate-pulse"></div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-green-400"></div>
+                    <div className="absolute inset-0 border-4 border-golden-500 opacity-50 animate-pulse"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-golden-400"></div>
                   </div>
                 )}
               </div>
@@ -362,7 +363,7 @@ export default function CheckInPage() {
                     value={manualEmail}
                     onChange={(e) => setManualEmail(e.target.value)}
                     placeholder="attendee@example.com"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-golden-500 transition-all"
                     disabled={loading}
                   />
                 </div>
@@ -370,7 +371,7 @@ export default function CheckInPage() {
                 <button
                   type="submit"
                   disabled={loading || !manualEmail.trim()}
-                  className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium shadow-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-burgundy-700 to-burgundy-800 hover:from-burgundy-800 hover:to-burgundy-900 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium shadow-lg transition-all flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <>
@@ -398,11 +399,11 @@ export default function CheckInPage() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-2xl shadow-xl p-6 border-2 border-green-500"
+              className="bg-white rounded-2xl shadow-xl p-6 border-2 border-golden-500"
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <div className="w-12 h-12 bg-golden-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-burgundy-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
@@ -425,9 +426,12 @@ export default function CheckInPage() {
                   <p className="text-xs text-gray-500 mb-1">Email</p>
                   <p className="font-semibold text-gray-900 text-sm break-all">{lastCheckIn.email}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Table</p>
-                  <p className="font-semibold text-gray-900">Table {lastCheckIn.tableNumber}</p>
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 mb-1">Assigned Table</p>
+                  <p className="font-semibold text-burgundy-700 text-lg">
+                    {lastCheckIn.tableName || `Table ${lastCheckIn.tableNumber}`}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Table {lastCheckIn.tableNumber}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Seat</p>

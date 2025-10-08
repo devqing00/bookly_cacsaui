@@ -158,14 +158,14 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
       {/* Decorative element */}
       <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50"></div>
       
-      <div className="bg-white border border-neutral-200 rounded-xl p-8 sm:p-10 shadow-soft relative overflow-hidden">
+      <div className="bg-white/90 backdrop-blur-md border border-neutral-200 rounded-xl p-8 sm:p-10 shadow-soft relative overflow-hidden">
         {/* Subtle corner accent */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-golden-50 rounded-full -translate-y-16 translate-x-16 opacity-50"></div>
         
         {/* Header */}
         <div className="mb-8 relative">
-          <div className="inline-block p-2 bg-green-50 rounded-lg mb-4">
-            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <div className="inline-block p-2 bg-golden-50 rounded-lg mb-4">
+            <svg className="w-6 h-6 text-burgundy-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
             </svg>
           </div>
@@ -223,7 +223,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                 className={`block w-full px-4 py-3 border ${
                   errors.name 
                     ? 'border-red-400 bg-red-50' 
-                    : 'border-neutral-300 focus:border-green-500 bg-white'
+                    : 'border-neutral-300 focus:border-golden-500 bg-white'
                 } rounded-lg text-neutral-900 placeholder-neutral-400 transition-all duration-150 focus:outline-none focus:ring-0 focus:shadow-soft`}
                 placeholder="Enter your full name"
                 disabled={isLoading}
@@ -268,8 +268,8 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                   errors.email 
                     ? 'border-red-400 bg-red-50'
                     : emailExists
-                    ? 'border-amber-400 bg-amber-50'
-                    : 'border-neutral-300 focus:border-green-500 bg-white'
+                    ? 'border-golden-400 bg-golden-50'
+                    : 'border-neutral-300 focus:border-golden-500 bg-white'
                 } rounded-lg text-neutral-900 placeholder-neutral-400 transition-all duration-150 focus:outline-none focus:ring-0 focus:shadow-soft`}
                 placeholder="your@email.com"
                 disabled={isLoading}
@@ -281,11 +281,11 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 ) : emailExists ? (
-                  <svg className="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-golden-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                   </svg>
                 ) : !errors.email && email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? (
-                  <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-golden-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 ) : (
@@ -326,7 +326,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                 className={`block w-full px-4 py-3 border ${
                   errors.phone 
                     ? 'border-red-400 bg-red-50' 
-                    : 'border-neutral-300 focus:border-green-500 bg-white'
+                    : 'border-neutral-300 focus:border-golden-500 bg-white'
                 } rounded-lg text-neutral-900 placeholder-neutral-400 transition-all duration-150 focus:outline-none focus:ring-0 focus:shadow-soft`}
                 placeholder="08012345678 or +2348012345678"
                 disabled={isLoading}
@@ -374,7 +374,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                 className={`block w-full px-4 py-3 border ${
                   errors.gender 
                     ? 'border-red-400 bg-red-50' 
-                    : 'border-neutral-300 focus:border-green-500 bg-white'
+                    : 'border-neutral-300 focus:border-golden-500 bg-white'
                 } rounded-lg text-neutral-900 transition-all duration-150 focus:outline-none focus:ring-0 focus:shadow-soft appearance-none cursor-pointer`}
                 disabled={isLoading}
               >
@@ -405,7 +405,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed mt-8 shadow-green relative overflow-hidden group"
+            className="w-full bg-burgundy-700 hover:bg-burgundy-800 active:bg-burgundy-900 text-white font-medium py-3 px-4 rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed mt-8 shadow-burgundy relative overflow-hidden group"
           >
             <span className="relative z-10 flex items-center justify-center">
               {isLoading ? (
@@ -441,14 +441,14 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                 </>
               )}
             </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-burgundy-700 to-burgundy-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
           </button>
         </form>
 
         {/* Footer Note */}
         <div className="mt-6 pt-6 border-t border-neutral-200 relative">
           <div className="flex items-center justify-center gap-2">
-            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-golden-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
             <p className="text-xs text-neutral-500">
