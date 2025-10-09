@@ -119,15 +119,15 @@ export default function ActivityLogPage() {
   const getActionColor = (action: string) => {
     switch (action) {
       case 'edit':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-golden-100 text-golden-800';
       case 'delete':
         return 'bg-red-100 text-red-700';
       case 'restore':
-        return 'bg-green-100 text-green-700';
+        return 'bg-burgundy-100 text-burgundy-700';
       case 'check-in':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-golden-200 text-burgundy-800';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-neutral-100 text-neutral-700';
     }
   };
 

@@ -45,9 +45,9 @@ export default function ConfirmationModal({
           className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+          <div className="bg-gradient-to-r from-burgundy-700 to-burgundy-600 p-6 text-white">
             <h2 className="text-2xl font-bold">Confirm Your Registration</h2>
-            <p className="text-blue-100 mt-1">Please review your details before submitting</p>
+            <p className="text-burgundy-100 mt-1">Please review your details before submitting</p>
           </div>
 
           {/* Content */}
@@ -55,34 +55,34 @@ export default function ConfirmationModal({
             <div className="space-y-3">
               {/* Name */}
               <div className="flex items-start">
-                <div className="w-24 text-sm font-semibold text-gray-500">Name:</div>
-                <div className="flex-1 text-gray-900 font-medium">{formData.name}</div>
+                <div className="w-24 text-sm font-semibold text-neutral-500">Name:</div>
+                <div className="flex-1 text-neutral-900 font-medium">{formData.name}</div>
               </div>
 
               {/* Email */}
               <div className="flex items-start">
-                <div className="w-24 text-sm font-semibold text-gray-500">Email:</div>
-                <div className="flex-1 text-gray-900 break-all">{formData.email}</div>
+                <div className="w-24 text-sm font-semibold text-neutral-500">Email:</div>
+                <div className="flex-1 text-neutral-900 break-all">{formData.email}</div>
               </div>
 
               {/* Phone */}
               <div className="flex items-start">
-                <div className="w-24 text-sm font-semibold text-gray-500">Phone:</div>
-                <div className="flex-1 text-gray-900">{formData.phone}</div>
+                <div className="w-24 text-sm font-semibold text-neutral-500">Phone:</div>
+                <div className="flex-1 text-neutral-900">{formData.phone}</div>
               </div>
 
               {/* Gender */}
               <div className="flex items-start">
-                <div className="w-24 text-sm font-semibold text-gray-500">Gender:</div>
-                <div className="flex-1 text-gray-900">{formData.gender}</div>
+                <div className="w-24 text-sm font-semibold text-neutral-500">Gender:</div>
+                <div className="flex-1 text-neutral-900">{formData.gender}</div>
               </div>
             </div>
 
             {/* Info Box */}
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mt-6 p-4 bg-golden-50 border border-golden-200 rounded-lg">
               <div className="flex items-start space-x-3">
-                <div className="text-blue-600 text-xl">ℹ️</div>
-                <div className="flex-1 text-sm text-blue-800">
+                <div className="text-golden-600 text-xl">ℹ️</div>
+                <div className="flex-1 text-sm text-burgundy-800">
                   By confirming, you&apos;ll be assigned to a table and seat. You&apos;ll receive your
                   registration details and QR code for check-in.
                 </div>
@@ -91,18 +91,18 @@ export default function ConfirmationModal({
           </div>
 
           {/* Footer */}
-          <div className="p-6 bg-gray-50 flex gap-3">
+          <div className="p-6 bg-neutral-50 flex gap-3">
             <button
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 bg-white border-2 border-neutral-300 text-neutral-700 font-semibold rounded-lg hover:bg-neutral-50 hover:border-neutral-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Edit Details
             </button>
             <button
               onClick={onConfirm}
               disabled={isLoading}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-burgundy-700 to-burgundy-600 text-white font-semibold rounded-lg hover:from-burgundy-800 hover:to-burgundy-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
               {isLoading ? (
                 <>

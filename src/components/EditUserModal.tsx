@@ -166,11 +166,11 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
           className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6 text-white">
+          <div className="bg-gradient-to-r from-burgundy-700 to-burgundy-600 p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Edit User</h2>
-                <p className="text-indigo-100 mt-1 text-sm">
+                <p className="text-burgundy-100 mt-1 text-sm">
                   Table {user.tableNumber}, Seat {tableWithId.seatIndex + 1}
                 </p>
               </div>
@@ -298,14 +298,14 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
+                className="flex-1 px-6 py-3 border-2 border-neutral-300 text-neutral-700 font-semibold rounded-lg hover:bg-neutral-50 transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all disabled:opacity-50 flex items-center justify-center"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-burgundy-700 to-burgundy-600 text-white font-semibold rounded-lg hover:from-burgundy-800 hover:to-burgundy-700 transition-all disabled:opacity-50 flex items-center justify-center"
               >
                 {loading ? (
                   <>

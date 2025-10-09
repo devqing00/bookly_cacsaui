@@ -168,10 +168,10 @@ export default function DeleteConfirmModal({
             </div>
 
             {/* Info Box */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="p-4 bg-golden-50 border border-golden-200 rounded-lg">
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0"
+                  className="w-5 h-5 text-golden-600 mt-0.5 flex-shrink-0"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -182,8 +182,8 @@ export default function DeleteConfirmModal({
                   />
                 </svg>
                 <div className="flex-1 text-sm">
-                  <p className="font-medium text-blue-900 mb-1">Undo Available</p>
-                  <p className="text-blue-700 text-xs">
+                  <p className="font-medium text-burgundy-900 mb-1">Undo Available</p>
+                  <p className="text-burgundy-700 text-xs">
                     Deleted users can be restored from the &quot;Deleted Users&quot; section in the admin
                     dashboard.
                   </p>
@@ -193,11 +193,11 @@ export default function DeleteConfirmModal({
           </div>
 
           {/* Footer */}
-          <div className="p-6 bg-gray-50 flex gap-3">
+          <div className="p-6 bg-neutral-50 flex gap-3">
             <button
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all disabled:opacity-50"
+              className="flex-1 px-6 py-3 bg-white border-2 border-neutral-300 text-neutral-700 font-semibold rounded-lg hover:bg-neutral-50 hover:border-neutral-400 transition-all disabled:opacity-50"
             >
               Cancel
             </button>

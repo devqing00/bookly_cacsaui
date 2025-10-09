@@ -443,6 +443,7 @@ export async function POST(request: Request) {
           to: sanitizedEmail,
           name: result.name,
           tableNumber: result.tableNumber,
+          tableName: result.tableName,
           seatNumber: result.seatNumber,
           phone: result.phone,
           gender: result.gender,

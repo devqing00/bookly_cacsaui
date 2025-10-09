@@ -262,9 +262,10 @@ function AdminPageContent() {
     };
 
     try {
-      toast.loading('Generating badge...');
+      const toastId = toast.loading('Generating badge...');
       const blob = await generateBadgePDF(badgeData);
       downloadBadge(blob, `badge-${attendee.name.replace(/\s+/g, '-')}.pdf`);
+      toast.dismiss(toastId);
       toast.success('Badge downloaded successfully!');
     } catch (error) {
       console.error('Badge generation error:', error);
@@ -286,9 +287,10 @@ function AdminPageContent() {
       }));
 
     try {
-      toast.loading(`Generating ${badges.length} badges...`);
+      const toastId = toast.loading(`Generating ${badges.length} badges...`);
       const blob = await generateBatchBadgesPDF(badges);
       downloadBadge(blob, `table-${table.tableNumber}-badges.pdf`);
+      toast.dismiss(toastId);
       toast.success(`${badges.length} badges downloaded successfully!`);
     } catch (error) {
       console.error('Batch badge generation error:', error);
@@ -320,9 +322,10 @@ function AdminPageContent() {
     }
 
     try {
-      toast.loading(`Generating ${allBadges.length} badges...`);
+      const toastId = toast.loading(`Generating ${allBadges.length} badges...`);
       const blob = await generateBatchBadgesPDF(allBadges);
       downloadBadge(blob, `all-badges-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast.dismiss(toastId);
       toast.success(`${allBadges.length} badges downloaded successfully!`);
     } catch (error) {
       console.error('Batch badge generation error:', error);
@@ -339,7 +342,7 @@ function AdminPageContent() {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-neutral-300 border-t-green-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-neutral-300 border-t-burgundy-700 mx-auto"></div>
           <p className="mt-4 text-sm text-neutral-600">Loading dashboard...</p>
         </div>
       </div>

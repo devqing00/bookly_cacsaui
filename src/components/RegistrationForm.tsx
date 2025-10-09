@@ -156,7 +156,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
       className="max-w-md mx-auto"
     >
       {/* Decorative element */}
-      <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50"></div>
+      <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-golden-500 to-transparent opacity-50"></div>
       
       <div className="bg-white/90 backdrop-blur-md border border-neutral-200 rounded-xl p-8 sm:p-10 shadow-soft relative overflow-hidden">
         {/* Subtle corner accent */}
@@ -328,7 +328,7 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                     ? 'border-red-400 bg-red-50' 
                     : 'border-neutral-300 focus:border-golden-500 bg-white'
                 } rounded-lg text-neutral-900 placeholder-neutral-400 transition-all duration-150 focus:outline-none focus:ring-0 focus:shadow-soft`}
-                placeholder="08012345678 or +2348012345678"
+                placeholder="08012345678"
                 disabled={isLoading}
               />
               {!errors.phone && (
@@ -381,8 +381,6 @@ export default function RegistrationForm({ onSubmit, isLoading }: RegistrationFo
                 <option value="">Select your gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
-                <option value="Other">Other</option>
-                <option value="Prefer not to say">Prefer not to say</option>
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                 <svg className="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

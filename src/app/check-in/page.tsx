@@ -135,8 +135,22 @@ export default function CheckInPage() {
           return;
         }
 
-        // Use the first available camera
-        const selectedDeviceId = videoInputDevices[0].deviceId;
+        // Prefer rear-facing camera (environment)
+        // Look for cameras with 'back', 'rear', or 'environment' in the label
+        let selectedDeviceId = videoInputDevices[0].deviceId;
+        
+        const rearCamera = videoInputDevices.find(device => 
+          device.label.toLowerCase().includes('back') ||
+          device.label.toLowerCase().includes('rear') ||
+          device.label.toLowerCase().includes('environment')
+        );
+        
+        if (rearCamera) {
+          selectedDeviceId = rearCamera.deviceId;
+        } else if (videoInputDevices.length > 1) {
+          // If we can't find by label, assume the last camera is the rear one (common pattern)
+          selectedDeviceId = videoInputDevices[videoInputDevices.length - 1].deviceId;
+        }
 
         codeReader.decodeFromVideoDevice(
           selectedDeviceId,

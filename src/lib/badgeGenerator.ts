@@ -15,7 +15,7 @@ export async function generateBadgePDF(attendee: BadgeData): Promise<Blob> {
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: [100, 150], // Badge size: 100mm x 150mm
+    format: [100, 210],
   });
 
   // Generate QR code with burgundy color
@@ -32,169 +32,201 @@ export async function generateBadgePDF(attendee: BadgeData): Promise<Blob> {
     { width: 300, margin: 1, color: { dark: '#5C2A2A', light: '#ffffff' } }
   );
 
-  // Background - soft golden tint
-  pdf.setFillColor(254, 252, 243); // golden-50
-  pdf.rect(0, 0, 100, 150, 'F');
-
-  // Top accent bar - burgundy gradient
-  pdf.setFillColor(92, 42, 42); // burgundy-700
-  pdf.rect(0, 0, 100, 4, 'F');
+  // ========== MODERN GRADIENT HERO SECTION ==========
+  // Background gradient (burgundy to darker burgundy)
+  // pdf.setFillColor(92, 42, 42); // burgundy-700
+  // pdf.rect(0, 0, 100, 75, 'F');
   
-  // Golden accent bar below
-  pdf.setFillColor(212, 162, 68); // golden-500
-  pdf.rect(0, 4, 100, 1, 'F');
-
-  // Event Header Section
-  pdf.setFillColor(255, 255, 255);
-  pdf.roundedRect(5, 10, 90, 30, 3, 3, 'F');
+  // Overlay darker gradient at top
+  pdf.setFillColor(74, 31, 31); // burgundy-800
+  pdf.rect(0, 0, 100, 100, 'F');
   
-  pdf.setDrawColor(212, 162, 68); // golden-500 border
-  pdf.setLineWidth(0.4);
-  pdf.roundedRect(5, 10, 90, 30, 3, 3, 'S');
+  // Golden accent stripe (modern diagonal feel)
+  // pdf.setFillColor(212, 162, 68); // golden-500
+  // pdf.rect(0, 70, 100, 5, 'F');
 
-  // Event Logo/Title
-  pdf.setTextColor(92, 42, 42); // burgundy-700
-  pdf.setFontSize(18);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('CACSAUI', 50, 19, { align: 'center' });
+  // Decorative circles (modern geometric pattern) - positioned at corners
+  // Top-left corner
+  pdf.setFillColor(212, 162, 68); // golden
+  pdf.circle(-10, -10, 40, 'F');
   
-  pdf.setFontSize(15);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Love Feast 2025', 50, 27, { align: 'center' });
+  // Top-right corner
+  pdf.setFillColor(255, 255, 255); // white
+  pdf.circle(110, -10, 40, 'F');
+  
+  // Bottom-left corner
+  pdf.setFillColor(255, 255, 255); // white
+  pdf.circle(-10, 100, 40, 'F');
+  
+  // Bottom-right corner
+  pdf.setFillColor(212, 162, 68); // golden
+  pdf.circle(110, 100, 40, 'F');
 
+  // Event Title - Modern Typography
+  pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(9);
-  pdf.setTextColor(120, 113, 108); // neutral-500
-  pdf.text('University of Ibadan', 50, 34, { align: 'center' });
-
-  // Decorative line
-  pdf.setDrawColor(212, 162, 68); // golden-500
-  pdf.setLineWidth(0.6);
-  pdf.line(20, 37, 80, 37);
-
-  // Attendee Name Section
-  pdf.setFillColor(253, 246, 226); // golden-100
-  pdf.roundedRect(5, 45, 90, 20, 2, 2, 'F');
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('CACSAUI PRESENTS', 50, 15, { align: 'center' });
   
-  pdf.setDrawColor(212, 162, 68); // golden-500
-  pdf.setLineWidth(0.3);
-  pdf.roundedRect(5, 45, 90, 20, 2, 2, 'S');
+  // Main Event Name - Bold & Large
+  pdf.setFontSize(22);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('LOVE FEAST', 50, 25, { align: 'center' });
+  
+  pdf.setFontSize(16);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('2025', 50, 33, { align: 'center' });
 
+  // Subtitle
   pdf.setFontSize(7);
-  pdf.setTextColor(92, 42, 42); // burgundy-700
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(212, 162, 68); // golden
+  pdf.text('UNIVERSITY OF IBADAN', 50, 40, { align: 'center' });
+
+  // Name Badge Section - Modern Card Style
+  pdf.setFontSize(6);
+  pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
   pdf.text('ATTENDEE', 50, 50, { align: 'center' });
 
-  // Name - handle long names
-  pdf.setFontSize(13);
-  pdf.setTextColor(23, 23, 23); // neutral-900
+  // Attendee Name - Large and Bold
+  pdf.setFontSize(16);
+  pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
-  const nameLines = pdf.splitTextToSize(attendee.name, 85);
-  const nameY = nameLines.length > 1 ? 56 : 59;
-  pdf.text(nameLines, 50, nameY, { align: 'center', maxWidth: 85 });
+  const nameLines = pdf.splitTextToSize(attendee.name.toUpperCase(), 90);
+  const nameY = nameLines.length > 1 ? 56 : 58;
+  pdf.text(nameLines, 50, nameY, { align: 'center', maxWidth: 90 });
 
-  // Table Assignment Card - Main Feature
-  const cardY = 70;
-  
-  // Card background with gradient effect
-  pdf.setFillColor(253, 246, 226); // golden-100
-  pdf.roundedRect(5, cardY, 90, 48, 3, 3, 'F');
-  
-  // Border - golden
-  pdf.setDrawColor(212, 162, 68); // golden-500
+  // Small decorative line under name
+  pdf.setDrawColor(212, 162, 68); // golden
   pdf.setLineWidth(0.5);
-  pdf.roundedRect(5, cardY, 90, 48, 3, 3, 'S');
+  const lineY = nameLines.length > 1 ? 64 : 63;
+  pdf.line(30, lineY, 70, lineY);
 
-  // Table Name Header
-  pdf.setFontSize(6);
-  pdf.setTextColor(92, 42, 42); // burgundy-700
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('YOUR ASSIGNED TABLE', 50, cardY + 5, { align: 'center' });
+  // ========== WHITE CONTENT SECTION ==========
+  // Clean white background for content
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 75, 100, 135, 'F');
 
-  // Table Name - wrap if too long
-  pdf.setFontSize(11);
-  pdf.setTextColor(74, 31, 31); // burgundy-800
-  pdf.setFont('helvetica', 'bold');
-  const tableName = attendee.tableName || `Table ${attendee.tableNumber}`;
-  const tableNameLines = pdf.splitTextToSize(tableName, 85);
-  const tableNameY = cardY + (tableNameLines.length > 1 ? 11 : 12);
-  pdf.text(tableNameLines, 50, tableNameY, { align: 'center', maxWidth: 85 });
-
-  // Divider line
-  const dividerY = cardY + (tableNameLines.length > 1 ? 20 : 18);
-  pdf.setDrawColor(212, 162, 68); // golden-500
-  pdf.setLineWidth(0.3);
-  pdf.line(15, dividerY, 85, dividerY);
-
-  // Table Number and Seat - Side by side
-  const numbersY = dividerY + 7;
+  // ========== TABLE ASSIGNMENT - MODERN SPLIT DESIGN ==========
+  const tableY = 80;
   
-  // Table Number (Left)
-  pdf.setFontSize(6);
-  pdf.setTextColor(92, 42, 42); // burgundy-700
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('TABLE NUMBER', 30, numbersY, { align: 'center' });
-  
-  pdf.setFontSize(28);
-  pdf.setTextColor(92, 42, 42); // burgundy-700
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(attendee.tableNumber.toString(), 30, numbersY + 12, { align: 'center' });
-
-  // Seat Number (Right)
-  pdf.setFontSize(6);
-  pdf.setTextColor(92, 42, 42); // burgundy-700
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('SEAT', 70, numbersY, { align: 'center' });
-  
-  pdf.setFontSize(22);
-  pdf.setTextColor(92, 42, 42); // burgundy-700
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(attendee.seatNumber.toString(), 70, numbersY + 11, { align: 'center' });
-
-  // Seat indicator dots
-  const dotsY = cardY + 43;
-  const dotStartX = 18;
-  const dotSpacing = 9;
-  
-  for (let i = 0; i < 8; i++) {
-    if (i < attendee.seatNumber) {
-      pdf.setFillColor(212, 162, 68); // golden-500 - filled
-    } else {
-      pdf.setFillColor(229, 231, 235); // neutral-200 - empty
-    }
-    pdf.circle(dotStartX + (i * dotSpacing), dotsY, 1.5, 'F');
+  // Table Name Banner (if exists)
+  if (attendee.tableName) {
+    pdf.setFillColor(253, 246, 226); // golden-100
+    pdf.roundedRect(8, tableY, 84, 15, 2, 2, 'F');
+    
+    pdf.setFontSize(5);
+    pdf.setTextColor(92, 42, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('YOUR TABLE', 50, tableY + 4, { align: 'center' });
+    
+    pdf.setFontSize(11);
+    pdf.setTextColor(92, 42, 42);
+    pdf.setFont('helvetica', 'bold');
+    const tableNameLines = pdf.splitTextToSize(attendee.tableName, 80);
+    pdf.text(tableNameLines, 50, tableY + 10, { align: 'center', maxWidth: 80 });
   }
 
-  // QR Code Section
-  const qrY = 124;
+  // Modern Number Cards - Side by Side with Icons
+  const cardsY = attendee.tableName ? tableY + 18 : tableY;
+  
+  // Left Card - Table Number
+  pdf.setFillColor(92, 42, 42); // burgundy
+  pdf.roundedRect(8, cardsY, 40, 42, 3, 3, 'F');
+  
+  // Icon circle background
+  pdf.setFillColor(212, 162, 68); // golden
+  pdf.circle(28, cardsY + 10, 6, 'F');
+  
+  // Icon text
+  pdf.setFontSize(10);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('T', 28, cardsY + 12, { align: 'center' });
+  
+  // Label
+  pdf.setFontSize(6);
+  pdf.setTextColor(212, 162, 68);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('TABLE', 28, cardsY + 22, { align: 'center' });
+  
+  // Number
+  pdf.setFontSize(24);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(attendee.tableNumber.toString(), 28, cardsY + 35, { align: 'center' });
+
+  // Right Card - Seat Number
+  pdf.setFillColor(212, 162, 68); // golden
+  pdf.roundedRect(52, cardsY, 40, 42, 3, 3, 'F');
+  
+  // Icon circle background
+  pdf.setFillColor(92, 42, 42); // burgundy
+  pdf.circle(72, cardsY + 10, 6, 'F');
+  
+  // Icon text
+  pdf.setFontSize(10);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('S', 72, cardsY + 12, { align: 'center' });
+  
+  // Label
+  pdf.setFontSize(6);
+  pdf.setTextColor(92, 42, 42);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('SEAT', 72, cardsY + 22, { align: 'center' });
+  
+  // Number
+  pdf.setFontSize(24);
+  pdf.setTextColor(92, 42, 42);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(attendee.seatNumber.toString(), 72, cardsY + 35, { align: 'center' });
+
+  // ========== QR CODE SECTION - MODERN CENTERED ==========
+  const qrY = cardsY + 50;
+  
+  // QR Background with shadow effect
+  pdf.setFillColor(248, 248, 248); // very light gray
+  pdf.roundedRect(28, qrY - 2, 44, 44, 3, 3, 'F');
+  
   pdf.setFillColor(255, 255, 255);
   pdf.roundedRect(30, qrY, 40, 40, 2, 2, 'F');
   
-  pdf.setDrawColor(212, 162, 68); // golden-500
-  pdf.setLineWidth(0.4);
+  // Thin golden border
+  pdf.setDrawColor(212, 162, 68);
+  pdf.setLineWidth(0.3);
   pdf.roundedRect(30, qrY, 40, 40, 2, 2, 'S');
   
   // Add QR code
   pdf.addImage(qrDataUrl, 'PNG', 33, qrY + 3, 34, 34);
 
-  // QR Instructions
+  // QR Instructions - Modern Style
+  pdf.setFontSize(7);
+  pdf.setTextColor(92, 42, 42);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('SCAN TO CHECK IN', 50, qrY + 48, { align: 'center' });
+  
   pdf.setFontSize(6);
-  pdf.setTextColor(120, 113, 108); // neutral-500
-  pdf.setFont('helvetica', 'italic');
-  pdf.text('Show this QR code at check-in', 50, 168, { align: 'center' });
+  pdf.setTextColor(120, 113, 108);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Present this at the entrance', 50, qrY + 53, { align: 'center' });
 
-  // Footer decoration
-  pdf.setDrawColor(212, 162, 68); // golden-500
-  pdf.setLineWidth(0.3);
-  pdf.line(25, 171, 75, 171);
+  // ========== BOTTOM FOOTER - MODERN MINIMAL ==========
+  // Decorative elements
+  pdf.setFillColor(92, 42, 42);
+  pdf.circle(10, 202, 1.5, 'F');
+  pdf.circle(90, 202, 1.5, 'F');
+  
+  pdf.setFillColor(212, 162, 68);
+  pdf.circle(15, 202, 1, 'F');
+  pdf.circle(85, 202, 1, 'F');
 
-  // Gender icon (small, subtle)
-  if (attendee.gender) {
-    pdf.setFontSize(5);
-    pdf.setTextColor(168, 162, 158); // neutral-400
-    pdf.setFont('helvetica', 'normal');
-    const genderText = attendee.gender === 'Male' ? 'M' : attendee.gender === 'Female' ? 'F' : 'O';
-    pdf.text(genderText, 8, 174);
-  }
+  // Bottom text
+  pdf.setFontSize(5);
+  pdf.setTextColor(168, 162, 158);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('An evening of fellowship & celebration', 50, 206, { align: 'center' });
 
   return pdf.output('blob');
 }
@@ -218,97 +250,126 @@ export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Bl
     
     const attendee = attendees[i];
     
-    // Background
-    pdf.setFillColor(254, 252, 243); // golden-50
+    // ===== MODERN HORIZONTAL BADGE DESIGN =====
+    
+    // Background - white
+    pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, 85.6, 54, 'F');
 
-    // Top burgundy bar
+    // Left Section - Burgundy Hero (30% width)
     pdf.setFillColor(92, 42, 42); // burgundy-700
-    pdf.rect(0, 0, 85.6, 4, 'F');
+    pdf.rect(0, 0, 25, 54, 'F');
+    
+    // Darker overlay at top
+    pdf.setFillColor(74, 31, 31); // burgundy-800
+    pdf.rect(0, 0, 25, 20, 'F');
 
-    // Secondary golden accent bar
+    // Golden accent vertical stripe
     pdf.setFillColor(212, 162, 68); // golden-500
-    pdf.rect(0, 4, 85.6, 1, 'F');
+    pdf.rect(24, 0, 1, 54, 'F');
 
-    // CACSAUI Love Feast Title
+    // Decorative circles on left
+    pdf.setFillColor(212, 162, 68, 0.1);
+    pdf.circle(-5, 10, 12, 'F');
+    pdf.circle(30, 45, 15, 'F');
+
+    // Event Title on left section - Vertical orientation feel
+    pdf.setFontSize(7);
+    pdf.setTextColor(212, 162, 68);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CACSAUI', 12.5, 12, { align: 'center' });
+    
+    pdf.setFontSize(10);
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('LOVE', 12.5, 20, { align: 'center' });
+    pdf.text('FEAST', 12.5, 27, { align: 'center' });
+    
     pdf.setFontSize(9);
-    pdf.setTextColor(92, 42, 42); // burgundy-700
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CACSAUI LOVE FEAST', 42.8, 10, { align: 'center' });
+    pdf.text('2025', 12.5, 34, { align: 'center' });
 
-    // Event Date
-    pdf.setFontSize(7);
-    pdf.setTextColor(113, 113, 122); // neutral-500
+    // Small subtitle
+    pdf.setFontSize(4);
+    pdf.setTextColor(212, 162, 68);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('October 11, 2025', 42.8, 15, { align: 'center' });
+    pdf.text('UI', 12.5, 42, { align: 'center' });
 
-    // Name
-    pdf.setFontSize(13);
-    pdf.setTextColor(23, 23, 23); // neutral-900
+    // Right Section - Content
+    const contentStartX = 28;
+    
+    // Attendee Name - Top Priority
+    pdf.setFontSize(11);
+    pdf.setTextColor(92, 42, 42);
     pdf.setFont('helvetica', 'bold');
-    const nameLines = pdf.splitTextToSize(attendee.name || '', 72);
-    pdf.text(nameLines, 42.8, 22, { align: 'center' });
+    const nameLines = pdf.splitTextToSize(attendee.name.toUpperCase() || '', 52);
+    pdf.text(nameLines, contentStartX, 10, { maxWidth: 52 });
 
-    // Table Assignment Label
-    pdf.setFontSize(7);
-    pdf.setTextColor(113, 113, 122); // neutral-500
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('YOUR ASSIGNED TABLE', 42.8, 30, { align: 'center' });
+    // Small divider
+    pdf.setDrawColor(212, 162, 68);
+    pdf.setLineWidth(0.3);
+    pdf.line(contentStartX, 14, contentStartX + 25, 14);
 
-    // Table Name
+    // Table Name (if exists)
+    let currentY = 18;
     if (attendee.tableName) {
-      pdf.setFontSize(11);
-      pdf.setTextColor(92, 42, 42); // burgundy-700
+      pdf.setFontSize(5);
+      pdf.setTextColor(120, 113, 108);
       pdf.setFont('helvetica', 'bold');
-      const tableNameLines = pdf.splitTextToSize(attendee.tableName, 72);
-      pdf.text(tableNameLines, 42.8, 35, { align: 'center' });
+      pdf.text('TABLE', contentStartX, currentY);
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(92, 42, 42);
+      pdf.setFont('helvetica', 'bold');
+      const tableNameLines = pdf.splitTextToSize(attendee.tableName, 52);
+      pdf.text(tableNameLines, contentStartX, currentY + 4, { maxWidth: 52 });
+      currentY += tableNameLines.length > 1 ? 10 : 8;
     }
 
-    // Table & Seat numbers side by side
-    const yPosition = attendee.tableName ? 42 : 37;
+    // Number Cards - Compact Side by Side
+    const cardsY = currentY + 2;
     
-    // Table Number
-    pdf.setFontSize(28);
-    pdf.setTextColor(92, 42, 42); // burgundy-700
+    // Table Card - Burgundy
+    pdf.setFillColor(92, 42, 42);
+    pdf.roundedRect(contentStartX, cardsY, 22, 18, 2, 2, 'F');
+    
+    pdf.setFontSize(5);
+    pdf.setTextColor(212, 162, 68);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`${attendee.tableNumber}`, 28, yPosition, { align: 'center' });
+    pdf.text('TABLE', contentStartX + 11, cardsY + 5, { align: 'center' });
     
-    pdf.setFontSize(8);
-    pdf.setTextColor(113, 113, 122); // neutral-500
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('TABLE', 28, yPosition + 5, { align: 'center' });
-
-    // Seat Number
-    pdf.setFontSize(22);
-    pdf.setTextColor(212, 162, 68); // golden-600
+    pdf.setFontSize(16);
+    pdf.setTextColor(255, 255, 255);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`${attendee.seatNumber}`, 57, yPosition, { align: 'center' });
-    
-    pdf.setFontSize(8);
-    pdf.setTextColor(113, 113, 122); // neutral-500
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('SEAT', 57, yPosition + 5, { align: 'center' });
+    pdf.text(attendee.tableNumber.toString(), contentStartX + 11, cardsY + 14, { align: 'center' });
 
-    // 8 Seat Indicator Dots
-    const dotY = 50;
-    const dotSpacing = 5;
-    const startX = 42.8 - (7 * dotSpacing) / 2;
+    // Seat Card - Golden
+    pdf.setFillColor(212, 162, 68);
+    pdf.roundedRect(contentStartX + 24, cardsY, 22, 18, 2, 2, 'F');
     
-    for (let j = 0; j < 8; j++) {
-      const x = startX + j * dotSpacing;
-      if (j + 1 === attendee.seatNumber) {
-        pdf.setFillColor(212, 162, 68); // golden-500 - active seat
-      } else {
-        pdf.setFillColor(229, 231, 235); // neutral-200 - inactive seat
-      }
-      pdf.circle(x, dotY, 1.5, 'F');
-    }
+    pdf.setFontSize(5);
+    pdf.setTextColor(92, 42, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('SEAT', contentStartX + 35, cardsY + 5, { align: 'center' });
+    
+    pdf.setFontSize(16);
+    pdf.setTextColor(92, 42, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(attendee.seatNumber.toString(), contentStartX + 35, cardsY + 14, { align: 'center' });
 
-    // QR Code
+    // QR Code - Top Right Corner
+    const qrSize = 16;
+    const qrX = 85.6 - qrSize - 3;
+    const qrY = 3;
+    
+    // QR background
+    pdf.setFillColor(248, 248, 248);
+    pdf.roundedRect(qrX - 1, qrY - 1, qrSize + 2, qrSize + 2, 1, 1, 'F');
+    
     const qrData = JSON.stringify({
       name: attendee.name,
       email: attendee.email,
       table: attendee.tableNumber,
+      tableName: attendee.tableName || '',
       seat: attendee.seatNumber,
       phone: attendee.phone,
       gender: attendee.gender,
@@ -321,25 +382,22 @@ export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Bl
         width: 200,
         margin: 1,
         color: {
-          dark: '#5C2A2A', // burgundy-700
+          dark: '#5C2A2A',
           light: '#FFFFFF',
         },
       });
 
       const qrImageData = canvas.toDataURL('image/png');
-      pdf.addImage(qrImageData, 'PNG', 69, 6, 14, 14);
+      pdf.addImage(qrImageData, 'PNG', qrX, qrY, qrSize, qrSize);
     } catch (error) {
       console.error('QR code generation error:', error);
     }
 
-    // Gender indicator (optional)
-    if (attendee.gender) {
-      pdf.setFontSize(8);
-      pdf.setTextColor(113, 113, 122);
-      pdf.setFont('helvetica', 'bold');
-      const genderText = attendee.gender === 'Male' ? 'M' : attendee.gender === 'Female' ? 'F' : 'O';
-      pdf.text(genderText, 8, 174);
-    }
+    // Bottom instruction text
+    pdf.setFontSize(4);
+    pdf.setTextColor(168, 162, 158);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Scan QR to check in', contentStartX, 50);
   }
 
   return pdf.output('blob');

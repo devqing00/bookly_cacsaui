@@ -110,7 +110,7 @@ export default function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                       id="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent transition-all"
                       placeholder="Enter admin password"
                       required
                       autoFocus
@@ -164,11 +164,11 @@ export default function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                 </div>
 
                 {/* Info Box */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-golden-50 border border-golden-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+                      className="h-5 w-5 text-golden-600 flex-shrink-0 mt-0.5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -180,10 +180,10 @@ export default function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <div className="text-sm text-blue-700">
+                    <div className="text-sm text-burgundy-800">
                       <p className="font-medium mb-1">First time login?</p>
-                      <p className="text-blue-600">
-                        Check your <code className="bg-blue-100 px-1 py-0.5 rounded">.env.local</code> file for the admin password.
+                      <p className="text-burgundy-700">
+                        Check your <code className="bg-golden-100 px-1 py-0.5 rounded">.env.local</code> file for the admin password.
                       </p>
                     </div>
                   </div>
