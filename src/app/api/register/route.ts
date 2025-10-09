@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import type { Table, Attendee } from '@/types';
 import { TOTAL_TABLES, SEATS_PER_TABLE, TABLE_NAMES } from '@/types';
+import { sendConfirmationEmail } from '@/lib/sendConfirmationEmail';
 
 const TABLES_COLLECTION = 'tables';
 
@@ -435,70 +436,39 @@ export async function POST(request: Request) {
         event: 'CACSAUI Love Feast',
       });
 
-      // Send email with a timeout to prevent hanging
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                      'http://localhost:3000';
-      
-      console.log('Sending email to:', sanitizedEmail, 'via', baseUrl);
+      console.log('Sending confirmation email to:', sanitizedEmail);
 
       try {
-        // Create email sending promise with better error handling
-        const emailPromise = fetch(`${baseUrl}/api/send-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: sanitizedEmail,
-            name: result.name,
-            tableNumber: result.tableNumber,
-            tableName: result.tableName,
-            seatNumber: result.seatNumber,
-            phone: result.phone,
-            gender: result.gender,
-            qrData,
-          }),
-        }).then(async (response) => {
-          // Log response details
-          console.log('Email API response status:', response.status);
-          console.log('Email API response content-type:', response.headers.get('content-type'));
-          
-          // Get response text first to handle both JSON and HTML responses
-          const responseText = await response.text();
-          
-          if (!response.ok) {
-            // Try to parse as JSON, fallback to raw text
-            let errorMessage;
-            try {
-              const data = JSON.parse(responseText);
-              errorMessage = data.error || response.statusText;
-            } catch {
-              errorMessage = `Non-JSON response: ${responseText.substring(0, 200)}`;
-            }
-            throw new Error(`Email API error (${response.status}): ${errorMessage}`);
-          }
-          
-          // Parse successful JSON response
-          try {
-            return JSON.parse(responseText);
-          } catch {
-            throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`);
-          }
+        // Call the email utility function directly (no HTTP request needed!)
+        const emailPromise = sendConfirmationEmail({
+          to: sanitizedEmail,
+          name: result.name,
+          tableNumber: result.tableNumber,
+          tableName: result.tableName,
+          seatNumber: result.seatNumber,
+          phone: result.phone,
+          gender: result.gender,
+          qrData,
         });
 
         // Create timeout promise (10 seconds max)
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise<{ success: false; error: string }>((_, reject) => 
           setTimeout(() => reject(new Error('Email sending timeout')), 10000)
         );
 
         // Race between email sending and timeout
         const emailResult = await Promise.race([emailPromise, timeoutPromise]);
-        console.log('Email sent successfully:', emailResult);
+        
+        if (emailResult.success) {
+          console.log('Email sent successfully:', emailResult.messageId);
+        } else {
+          console.error('Email sending failed:', emailResult.error);
+        }
       } catch (emailError) {
         // Log email error but don't fail the registration
         console.error('Failed to send confirmation email:', {
           error: emailError instanceof Error ? emailError.message : 'Unknown error',
           to: sanitizedEmail,
-          baseUrl,
         });
         // Still continue with successful registration response
       }
