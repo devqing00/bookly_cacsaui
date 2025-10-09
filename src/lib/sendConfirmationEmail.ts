@@ -261,7 +261,7 @@ export async function sendConfirmationEmail(options: EmailOptions): Promise<Emai
                       <strong style="color:#5c2a2a">Check-In:</strong> Show QR code or provide email
                     </p>
                     <p style="margin:0;font-size:14px;color:#5c4530;line-height:1.6">
-                      <strong style="color:#5c2a2a">Contact:</strong> cacsaui@uniibadan.edu.ng
+                      <strong style="color:#5c2a2a">Contact:</strong> adetayoalexander00@gmail.com
                     </p>
                   </td>
                 </tr>
