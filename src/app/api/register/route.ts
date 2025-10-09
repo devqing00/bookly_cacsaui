@@ -436,7 +436,13 @@ export async function POST(request: Request) {
       });
 
       // Send email asynchronously without blocking the response
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-email`, {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                      'http://localhost:3000';
+      
+      console.log('Sending email to:', sanitizedEmail, 'via', baseUrl);
+
+      fetch(`${baseUrl}/api/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -449,9 +455,25 @@ export async function POST(request: Request) {
           gender: result.gender,
           qrData,
         }),
-      }).catch(emailError => {
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => {
+            throw new Error(`Email API error: ${data.error || response.statusText}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log('Email sent successfully:', data);
+      })
+      .catch(emailError => {
         // Log email error but don't fail the registration
-        console.error('Failed to send confirmation email:', emailError);
+        console.error('Failed to send confirmation email:', {
+          error: emailError.message,
+          to: sanitizedEmail,
+          baseUrl,
+        });
       });
     }
 

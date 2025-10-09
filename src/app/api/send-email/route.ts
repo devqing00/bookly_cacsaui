@@ -1,6 +1,14 @@
 ﻿import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
+// Validate environment variables
+if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+  console.error("Missing email configuration:", {
+    GMAIL_USER: process.env.GMAIL_USER ? "Set" : "Missing",
+    GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? "Set" : "Missing",
+  });
+}
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -22,6 +30,22 @@ interface EmailRequest {
 
 export async function POST(request: Request) {
   try {
+    // Check environment variables
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+      console.error("Email configuration missing in environment variables");
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "Email service not configured. Please contact administrator.",
+          debug: {
+            GMAIL_USER: process.env.GMAIL_USER ? "Set" : "Missing",
+            GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? "Set" : "Missing",
+          }
+        },
+        { status: 500 }
+      );
+    }
+
     const {
       to,
       name,
@@ -311,18 +335,30 @@ export async function POST(request: Request) {
       html: htmlContent,
     });
 
+    console.log("Email sent successfully:", {
+      messageId: info.messageId,
+      to: to,
+      accepted: info.accepted,
+      rejected: info.rejected,
+    });
+
     return NextResponse.json({
       success: true,
       messageId: info.messageId || "sent",
       message: "Confirmation email sent successfully",
     });
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("Error sending email:", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
 
     return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : "Failed to send email",
+        details: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );
