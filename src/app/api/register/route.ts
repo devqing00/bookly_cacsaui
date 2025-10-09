@@ -443,7 +443,7 @@ export async function POST(request: Request) {
       console.log('Sending email to:', sanitizedEmail, 'via', baseUrl);
 
       try {
-        // Create email sending promise
+        // Create email sending promise with better error handling
         const emailPromise = fetch(`${baseUrl}/api/send-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -457,13 +457,32 @@ export async function POST(request: Request) {
             gender: result.gender,
             qrData,
           }),
-        }).then(response => {
+        }).then(async (response) => {
+          // Log response details
+          console.log('Email API response status:', response.status);
+          console.log('Email API response content-type:', response.headers.get('content-type'));
+          
+          // Get response text first to handle both JSON and HTML responses
+          const responseText = await response.text();
+          
           if (!response.ok) {
-            return response.json().then(data => {
-              throw new Error(`Email API error: ${data.error || response.statusText}`);
-            });
+            // Try to parse as JSON, fallback to raw text
+            let errorMessage;
+            try {
+              const data = JSON.parse(responseText);
+              errorMessage = data.error || response.statusText;
+            } catch {
+              errorMessage = `Non-JSON response: ${responseText.substring(0, 200)}`;
+            }
+            throw new Error(`Email API error (${response.status}): ${errorMessage}`);
           }
-          return response.json();
+          
+          // Parse successful JSON response
+          try {
+            return JSON.parse(responseText);
+          } catch {
+            throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`);
+          }
         });
 
         // Create timeout promise (10 seconds max)

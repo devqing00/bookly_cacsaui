@@ -1,22 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
-// Validate environment variables
-if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-  console.error("Missing email configuration:", {
-    GMAIL_USER: process.env.GMAIL_USER ? "Set" : "Missing",
-    GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? "Set" : "Missing",
-  });
-}
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
-
 interface EmailRequest {
   to: string;
   name: string;
@@ -30,17 +14,21 @@ interface EmailRequest {
 
 export async function POST(request: Request) {
   try {
+    console.log("=== Email API Called ===");
+    
     // Check environment variables
     if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
       console.error("Email configuration missing in environment variables");
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: "Email service not configured. Please contact administrator.",
           debug: {
             GMAIL_USER: process.env.GMAIL_USER ? "Set" : "Missing",
-            GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? "Set" : "Missing",
-          }
+            GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD
+              ? "Set"
+              : "Missing",
+          },
         },
         { status: 500 }
       );
@@ -57,12 +45,25 @@ export async function POST(request: Request) {
       qrData,
     }: EmailRequest = await request.json();
 
+    console.log("Email request for:", { to, name, tableNumber, seatNumber });
+
     if (!to || !name || !tableNumber || !seatNumber) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
         { status: 400 }
       );
     }
+
+    // Create transporter inside the function to handle errors properly
+    console.log("Creating nodemailer transporter...");
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
