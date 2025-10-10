@@ -5,6 +5,7 @@ interface EmailRequest {
   to: string;
   name: string;
   tableNumber: number;
+  tent: number;
   tableName?: string;
   seatNumber: number;
   phone?: string;
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
       to,
       name,
       tableNumber,
+      tent,
       tableName,
       seatNumber,
       phone,
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
       qrData,
     }: EmailRequest = await request.json();
 
-    if (!to || !name || !tableNumber || !seatNumber) {
+    if (!to || !name || !tableNumber || !tent || !seatNumber) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
         { status: 400 }
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
       to,
       name,
       tableNumber,
+      tent,
       tableName,
       seatNumber,
       phone,
