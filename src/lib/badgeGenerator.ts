@@ -20,6 +20,7 @@ function registerFonts() {
   if (fontsRegistered) return;
   
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfApi: any = (jsPDF as any).API;
     
     // Register Montserrat (use as default for body text)
@@ -78,6 +79,7 @@ export async function generateBadgePDF(attendee: BadgeData): Promise<Blob> {
   return pdf.output('blob');
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function renderTicket(pdf: any, attendee: BadgeData, qrCode?: string, trophyImageData?: string) {
   const W = 203.2;
   const H = 63.5;
@@ -85,7 +87,6 @@ function renderTicket(pdf: any, attendee: BadgeData, qrCode?: string, trophyImag
   // Layout configuration
   const STUB_WIDTH = 42; // Wider stub for better layout
   const PERF_X = W - STUB_WIDTH;
-  const LEFT_MARGIN = 12;
   
   // === BACKGROUND ===
   pdf.setFillColor(18, 18, 18); // Deep black
@@ -109,7 +110,7 @@ function renderTicket(pdf: any, attendee: BadgeData, qrCode?: string, trophyImag
   if (trophyImageData) {
     try {
       pdf.addImage(trophyImageData, 'PNG', trophyX, trophyY, trophySize, trophySize);
-    } catch (err) {
+    } catch {
       console.warn('Trophy image failed, using fallback');
     }
   }

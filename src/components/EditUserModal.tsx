@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import type { Table } from '@/types';
-import { TOTAL_TENTS, TABLES_PER_TENT, getTableName } from '@/types';
+import { TABLES_PER_TENT, getTableName } from '@/types';
 
 interface EditUserModalProps {
   isOpen: boolean;

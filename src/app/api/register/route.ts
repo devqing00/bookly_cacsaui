@@ -9,12 +9,11 @@ import {
   doc,
   runTransaction,
   orderBy,
-  where,
   QueryDocumentSnapshot,
   DocumentData,
 } from 'firebase/firestore';
 import type { Table, Attendee } from '@/types';
-import { TOTAL_TENTS, TABLES_PER_TENT, SEATS_PER_TABLE, getTableName, BASE_TABLE_NAMES } from '@/types';
+import { TOTAL_TENTS, TABLES_PER_TENT, SEATS_PER_TABLE, getTableName } from '@/types';
 import { sendConfirmationEmail } from '@/lib/sendConfirmationEmail';
 
 const TABLES_COLLECTION = 'tables';

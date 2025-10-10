@@ -184,7 +184,7 @@ export async function PUT(request: Request) {
           const tablesRef = collection(db, TABLES_COLLECTION);
           const allTablesSnapshot = await getDocs(tablesRef);
           
-          let targetTableDoc = allTablesSnapshot.docs.find(doc => {
+          const targetTableDoc = allTablesSnapshot.docs.find(doc => {
             const data = doc.data() as Table;
             return data.tableNumber === targetTableNumber && data.tent === targetTent;
           });
