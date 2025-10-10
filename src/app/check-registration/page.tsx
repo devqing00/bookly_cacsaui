@@ -16,6 +16,7 @@ export default function CheckRegistrationPage() {
     gender?: string;
     tableNumber: number;
     tableName?: string;
+    tent: number;
     seatNumber: number;
     checkedIn?: boolean;
     checkedInAt?: string;
@@ -67,6 +68,7 @@ export default function CheckRegistrationPage() {
   const registrationData = registration ? JSON.stringify({
     name: registration.name,
     email: registration.email,
+    tent: registration.tent,
     table: registration.tableNumber,
     seat: registration.seatNumber,
     phone: registration.phone,
@@ -270,9 +272,17 @@ export default function CheckRegistrationPage() {
 
                 {/* Table Assignment - Highlighted */}
                 <div className="p-6 bg-gradient-to-br from-burgundy-50 to-golden-50 rounded-lg border-2 border-burgundy-200">
-                  <p className="text-xs text-burgundy-700 uppercase tracking-wide mb-3 font-semibold">
+                  <p className="text-xs text-burgundy-700 uppercase tracking-wide mb-3 font-semibold text-center">
                     Your Assignment
                   </p>
+                  
+                  {/* Tent Badge */}
+                  <div className="mb-4 text-center">
+                    <span className="inline-block text-xs font-bold text-burgundy-700 bg-burgundy-100 px-4 py-1.5 rounded-full uppercase tracking-widest">
+                      Tent {registration.tent}
+                    </span>
+                  </div>
+                  
                   {registration.tableName && (
                     <div className="mb-4 text-center">
                       <p className="text-2xl font-bold text-burgundy-700">

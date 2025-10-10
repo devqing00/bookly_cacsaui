@@ -136,6 +136,7 @@ export default function Home() {
               email={registrationResult.email}
               tableNumber={registrationResult.tableNumber!}
               tableName={registrationResult.tableName}
+              tent={registrationResult.tent}
               seatNumber={registrationResult.seatNumber}
               isExisting={registrationResult.isExisting}
               phone={registrationResult.phone}

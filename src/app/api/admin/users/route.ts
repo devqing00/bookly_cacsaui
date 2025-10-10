@@ -47,6 +47,7 @@ export async function GET() {
     const allAttendees: Array<{
       tableId: string;
       tableNumber: number;
+      tent: number;
       seatNumber: number;
       name: string;
       email: string;
@@ -62,6 +63,7 @@ export async function GET() {
         allAttendees.push({
           tableId: doc.id,
           tableNumber: tableData.tableNumber,
+          tent: tableData.tent,
           seatNumber: index + 1,
           name: attendee.name,
           email: attendee.email,
@@ -87,7 +89,7 @@ export async function GET() {
 // PUT - Edit user details
 export async function PUT(request: Request) {
   try {
-    const { tableId, seatIndex, name, email, phone, gender } = await request.json();
+    const { tableId, seatIndex, name, email, phone, gender, newTableNumber, newTent } = await request.json();
 
     // Validate required fields
     if (!tableId || seatIndex === undefined) {
@@ -145,7 +147,117 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Update the attendee
+    // Handle table/tent reassignment
+    if ((newTableNumber !== undefined && newTableNumber !== null) || (newTent !== undefined && newTent !== null)) {
+      // Use transaction to ensure atomicity when moving between tables
+      const result = await runTransaction(db, async (transaction) => {
+        const oldTableRef = doc(db, TABLES_COLLECTION, tableId);
+        const oldTableDoc = await transaction.get(oldTableRef);
+
+        if (!oldTableDoc.exists()) {
+          throw new Error('Source table not found');
+        }
+
+        const oldTableData = oldTableDoc.data() as Table;
+        const attendee = oldTableData.attendees[seatIndex];
+
+        if (!attendee) {
+          throw new Error('Attendee not found');
+        }
+
+        // Update attendee details
+        const updatedAttendee: Attendee = {
+          ...attendee,
+          name: sanitizedName || attendee.name,
+          email: sanitizedEmail || attendee.email,
+          phone: sanitizedPhone !== undefined ? sanitizedPhone : attendee.phone,
+          gender: (sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say') || attendee.gender,
+          tent: newTent !== undefined && newTent !== null ? newTent : attendee.tent,
+        };
+
+        const targetTent = newTent !== undefined && newTent !== null ? newTent : oldTableData.tent;
+        const targetTableNumber = newTableNumber !== undefined && newTableNumber !== null ? newTableNumber : oldTableData.tableNumber;
+
+        // Check if moving to a different table or tent
+        if (targetTableNumber !== oldTableData.tableNumber || targetTent !== oldTableData.tent) {
+          // Find or create the target table
+          const tablesRef = collection(db, TABLES_COLLECTION);
+          const allTablesSnapshot = await getDocs(tablesRef);
+          
+          let targetTableDoc = allTablesSnapshot.docs.find(doc => {
+            const data = doc.data() as Table;
+            return data.tableNumber === targetTableNumber && data.tent === targetTent;
+          });
+
+          if (targetTableDoc) {
+            // Target table exists, add attendee there
+            const targetTableData = targetTableDoc.data() as Table;
+            
+            if (targetTableData.seat_count >= targetTableData.maxCapacity) {
+              throw new Error('Target table is full');
+            }
+
+            const newAttendees = [...targetTableData.attendees, updatedAttendee];
+            transaction.update(targetTableDoc.ref, {
+              attendees: newAttendees,
+              seat_count: newAttendees.length,
+            });
+          } else {
+            // Target table doesn't exist, create it
+            const { getTableName, SEATS_PER_TABLE } = await import('@/types');
+            const newTable: Omit<Table, 'table_id'> = {
+              tableNumber: targetTableNumber,
+              tent: targetTent,
+              tableName: getTableName(targetTableNumber, targetTent),
+              attendees: [updatedAttendee],
+              seat_count: 1,
+              maxCapacity: SEATS_PER_TABLE,
+            };
+
+            const newTableRef = doc(collection(db, TABLES_COLLECTION));
+            transaction.set(newTableRef, {
+              ...newTable,
+              table_id: `table_${targetTableNumber}_tent_${targetTent}`,
+            });
+          }
+
+          // Remove from old table
+          const oldAttendees = [...oldTableData.attendees];
+          oldAttendees.splice(seatIndex, 1);
+          
+          transaction.update(oldTableRef, {
+            attendees: oldAttendees,
+            seat_count: oldAttendees.length,
+          });
+
+          return {
+            success: true,
+            message: 'Attendee moved successfully',
+            movedTo: {
+              tableNumber: targetTableNumber,
+              tent: targetTent,
+            },
+          };
+        } else {
+          // Same table, just update details
+          const updatedAttendees = [...oldTableData.attendees];
+          updatedAttendees[seatIndex] = updatedAttendee;
+
+          transaction.update(oldTableRef, {
+            attendees: updatedAttendees,
+          });
+
+          return {
+            success: true,
+            message: 'Attendee updated successfully',
+          };
+        }
+      });
+
+      return NextResponse.json(result);
+    }
+
+    // No reassignment, just update details in place
     const tableRef = doc(db, TABLES_COLLECTION, tableId);
     const tableSnapshot = await getDoc(tableRef);
 

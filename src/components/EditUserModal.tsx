@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import type { Table } from '@/types';
+import { TOTAL_TENTS, TABLES_PER_TENT, getTableName } from '@/types';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('');
+  const [tent, setTent] = useState(1);
+  const [tableNumber, setTableNumber] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
@@ -29,6 +32,8 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
       setEmail(attendee.email);
       setPhone(attendee.phone || '');
       setGender(attendee.gender);
+      setTent(user.tent || 1);
+      setTableNumber(user.tableNumber || 1);
       setErrors({});
     }
   }, [user]);
@@ -88,6 +93,8 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
           email: email.trim().toLowerCase(),
           phone: phone.trim(),
           gender,
+          newTent: tent,
+          newTableNumber: tableNumber,
         }),
       });
 
@@ -107,9 +114,9 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
               action: 'edit',
               attendeeName: name.trim(),
               attendeeEmail: email.trim().toLowerCase(),
-              tableNumber: user.tableNumber,
+              tableNumber: tableNumber,
               seatNumber: tableWithId.seatIndex + 1,
-              details: `Updated user details`,
+              details: `Updated user details (Tent ${tent}, Table ${tableNumber})`,
             }),
           });
         } catch (logError) {
@@ -171,7 +178,7 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
               <div>
                 <h2 className="text-2xl font-bold">Edit User</h2>
                 <p className="text-burgundy-100 mt-1 text-sm">
-                  Table {user.tableNumber}, Seat {tableWithId.seatIndex + 1}
+                  Tent {user.tent || 1} - Table {user.tableNumber}, Seat {tableWithId.seatIndex + 1}
                 </p>
               </div>
               <button
@@ -290,6 +297,49 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }: Edit
               {errors.gender && (
                 <p className="mt-1 text-sm text-red-600">{errors.gender}</p>
               )}
+            </div>
+
+            {/* Tent Selection */}
+            <div>
+              <label htmlFor="edit-tent" className="block text-sm font-medium text-gray-700 mb-2">
+                Tent *
+              </label>
+              <select
+                id="edit-tent"
+                value={tent}
+                onChange={(e) => setTent(Number(e.target.value))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none"
+                disabled={loading}
+              >
+                {[1, 2, 3].map((tentNum) => (
+                  <option key={tentNum} value={tentNum}>
+                    Tent {tentNum}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Table Number Selection */}
+            <div>
+              <label htmlFor="edit-table" className="block text-sm font-medium text-gray-700 mb-2">
+                Table *
+              </label>
+              <select
+                id="edit-table"
+                value={tableNumber}
+                onChange={(e) => setTableNumber(Number(e.target.value))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none"
+                disabled={loading}
+              >
+                {Array.from({ length: TABLES_PER_TENT }, (_, i) => i + 1).map((num) => (
+                  <option key={num} value={num}>
+                    {num} - {getTableName(num, tent)}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-sm text-gray-500">
+                Currently: Table {user?.tableNumber} - {user ? getTableName(user.tableNumber, user.tent || 1) : ''}
+              </p>
             </div>
 
             {/* Buttons */}

@@ -14,7 +14,7 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 import type { Table, Attendee } from '@/types';
-import { TOTAL_TABLES, SEATS_PER_TABLE, TABLE_NAMES } from '@/types';
+import { TOTAL_TENTS, TABLES_PER_TENT, SEATS_PER_TABLE, getTableName, BASE_TABLE_NAMES } from '@/types';
 import { sendConfirmationEmail } from '@/lib/sendConfirmationEmail';
 
 const TABLES_COLLECTION = 'tables';
@@ -58,7 +58,8 @@ async function checkExistingRegistration(email: string) {
       return {
         exists: true,
         tableNumber: tableData.tableNumber,
-        tableName: TABLE_NAMES[tableData.tableNumber],
+        tent: tableData.tent,
+        tableName: getTableName(tableData.tableNumber, tableData.tent),
         seatNumber: attendeeIndex + 1,
         name: attendee.name,
         phone: attendee.phone,
@@ -69,78 +70,6 @@ async function checkExistingRegistration(email: string) {
   }
   
   return { exists: false };
-}
-
-// Helper function to count gender distribution in a table
-function getGenderCounts(attendees: Attendee[]) {
-  const counts = { Male: 0, Female: 0, Other: 0 };
-  attendees.forEach((a) => {
-    if (a.gender === 'Male') counts.Male++;
-    else if (a.gender === 'Female') counts.Female++;
-    else counts.Other++;
-  });
-  return counts;
-}
-
-// Helper function to calculate gender balance score (lower is better)
-function calculateGenderBalanceScore(attendees: Attendee[], newGender: string) {
-  const counts = getGenderCounts(attendees);
-  
-  // Increment the count for the new attendee's gender
-  if (newGender === 'Male') counts.Male++;
-  else if (newGender === 'Female') counts.Female++;
-  else counts.Other++;
-  
-  // Calculate imbalance (absolute difference between male and female counts)
-  const imbalance = Math.abs(counts.Male - counts.Female);
-  
-  // Return score: prefer tables with better gender balance
-  return imbalance;
-}
-
-// Smart table selection with TRUE randomization and gender balancing
-function selectBestTable(availableTables: Array<{ doc: QueryDocumentSnapshot<DocumentData>; data: Table }>, newGender: string) {
-  if (availableTables.length === 0) {
-    throw new Error('No available tables');
-  }
-
-  // FIRST: Shuffle the available tables to ensure true randomization
-  // This is critical - we randomize BEFORE scoring
-  const shuffledTables = [...availableTables].sort(() => Math.random() - 0.5);
-  
-  // Score each table based on:
-  // 1. Gender balance (primary factor)
-  // 2. Current occupancy with randomization factor
-  // 3. Add random noise to prevent sequential filling
-  
-  const scoredTables = shuffledTables.map(({ doc, data }) => {
-    const balanceScore = calculateGenderBalanceScore(data.attendees, newGender);
-    const occupancyScore = data.seat_count;
-    
-    // Add random factor (0-2) to break ties and add variety
-    const randomFactor = Math.random() * 2;
-    
-    // Combined score with weights:
-    // - Gender balance: weight 15 (most important)
-    // - Occupancy: weight 3 (prefer spreading across tables)
-    // - Random factor: weight 1 (adds variety)
-    const totalScore = (balanceScore * 15) + (occupancyScore * 3) + randomFactor;
-    
-    return { doc, data, totalScore, balanceScore, occupancyScore };
-  });
-  
-  // Sort by total score (lowest is best)
-  scoredTables.sort((a, b) => a.totalScore - b.totalScore);
-  
-  // SMART SELECTION:
-  // Instead of just picking the best, we pick from the top 30% of tables
-  // This ensures variety while still maintaining good gender balance
-  const topCount = Math.max(1, Math.ceil(scoredTables.length * 0.3));
-  const topTables = scoredTables.slice(0, topCount);
-  
-  // Randomly select from the top tables
-  const randomIndex = Math.floor(Math.random() * topTables.length);
-  return topTables[randomIndex].doc;
 }
 
 export async function POST(request: Request) {
@@ -193,6 +122,7 @@ export async function POST(request: Request) {
             phone: existingReg.phone,
             gender: existingReg.gender,
             tableNumber: existingReg.tableNumber,
+            tent: existingReg.tent,
             tableName: existingReg.tableName,
             seatNumber: existingReg.seatNumber,
             registeredAt: existingReg.registeredAt,
@@ -208,6 +138,7 @@ export async function POST(request: Request) {
         success: true,
         isExisting: true,
         tableNumber: existingReg.tableNumber,
+        tent: existingReg.tent,
         tableName: existingReg.tableName,
         seatNumber: existingReg.seatNumber,
         name: existingReg.name,
@@ -227,161 +158,147 @@ export async function POST(request: Request) {
         result = await runTransaction(db, async (transaction) => {
           const tablesRef = collection(db, TABLES_COLLECTION);
           
-          let querySnapshot;
+          // Get all tables
+          const allTablesQuery = query(tablesRef);
+          const allTablesSnapshot = await getDocs(allTablesQuery);
           
-          try {
-            // Query for tables with available seats (no specific ordering for randomization)
-            const q = query(
-              tablesRef,
-              where('seat_count', '<', SEATS_PER_TABLE)
-            );
-            querySnapshot = await getDocs(q);
-          } catch (indexError: unknown) {
-            // Fallback: If index doesn't exist yet, get all tables and filter manually
-            if (indexError instanceof Error && 'code' in indexError && (indexError as { code: string }).code === 'failed-precondition') {
-              console.log('Index not ready, using fallback query...');
-              const allTablesQuery = query(tablesRef);
-              const allTables = await getDocs(allTablesQuery);
-              
-              // Filter manually for tables with available seats
-              const availableTables = allTables.docs.filter(
-                doc => (doc.data() as Table).seat_count < SEATS_PER_TABLE
-              );
-              
-              // Create a mock QuerySnapshot with filtered docs
-              querySnapshot = {
-                docs: availableTables,
-                empty: availableTables.length === 0
-              } as { docs: typeof availableTables; empty: boolean };
-            } else {
-              throw indexError;
-            }
-          }
+          // COMPLETELY RANDOM ASSIGNMENT: Randomly select tent first
+          const assignedTent = Math.floor(Math.random() * TOTAL_TENTS) + 1; // 1, 2, or 3
           
-          const newAttendee: Attendee = {
-            name: sanitizedName,
-            email: sanitizedEmail,
-            phone: sanitizedPhone,
-            gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
-            registeredAt: new Date(),
-          };
-
+          // Filter tables for the selected tent with available seats
+          const tentTables = allTablesSnapshot.docs
+            .map(doc => ({ doc, data: doc.data() as Table }))
+            .filter(({ data }) => data.tent === assignedTent && data.seat_count < SEATS_PER_TABLE);
+          
           let assignedTableNumber: number;
           let assignedTableName: string;
-          let seatNumber: number;
+          let assignedSeat: number;
+          let selectedTableDoc: QueryDocumentSnapshot<DocumentData> | null = null;
 
-          // Check if we should create a new table for better distribution
-          const shouldCreateNewTable = await (async () => {
-            // If no tables exist, create first table
-            if (querySnapshot.empty) return true;
-            
-            // Get count of all existing tables
-            const allTablesQuery = query(tablesRef);
-            const allTablesSnapshot = await getDocs(allTablesQuery);
-            const currentTableCount = allTablesSnapshot.size;
-            
-            // If we haven't reached the table limit, consider creating new tables
-            if (currentTableCount < TOTAL_TABLES) {
-              // Calculate average occupancy across all tables
-              let totalOccupancy = 0;
-              allTablesSnapshot.docs.forEach(doc => {
-                totalOccupancy += (doc.data() as Table).seat_count;
-              });
-              const avgOccupancy = totalOccupancy / currentTableCount;
-              
-              // SMART DISTRIBUTION LOGIC:
-              // Create a new table if:
-              // 1. Average occupancy is >= 3 (spreading out early registrations)
-              // 2. Or with 40% probability when avg occupancy >= 2 (adds randomness)
-              // This ensures users spread across multiple tables from the start
-              if (avgOccupancy >= 3) {
-                return true;
-              } else if (avgOccupancy >= 2 && Math.random() < 0.4) {
-                return true;
-              }
-            }
-            
-            return false;
-          })();
-
-          if (!querySnapshot.empty && !shouldCreateNewTable) {
-            // GENDER-BALANCED RANDOMIZED ASSIGNMENT TO EXISTING TABLE
-            const availableTables = querySnapshot.docs.map(doc => ({
-              doc,
-              data: doc.data() as Table
-            }));
-            
-            // Use smart selection based on gender balance
-            const selectedTable = selectBestTable(availableTables, sanitizedGender);
-            
-            const tableData = selectedTable.data() as Table;
-            const tableRef = doc(db, TABLES_COLLECTION, selectedTable.id);
-
-            const updatedAttendees = [...tableData.attendees, newAttendee];
-            const updatedSeatCount = updatedAttendees.length;
-
-            transaction.update(tableRef, {
-              attendees: updatedAttendees,
-              seat_count: updatedSeatCount,
-            });
+          if (tentTables.length > 0) {
+            // Randomly select from available tables in this tent
+            const randomTableIndex = Math.floor(Math.random() * tentTables.length);
+            const selectedTable = tentTables[randomTableIndex];
+            selectedTableDoc = selectedTable.doc;
+            const tableData = selectedTable.data;
 
             assignedTableNumber = tableData.tableNumber;
-            assignedTableName = TABLE_NAMES[tableData.tableNumber];
-            seatNumber = updatedSeatCount;
-          } else {
-            // CREATE A NEW TABLE for better distribution
-            // First, get all existing tables to find the best new table number
-            const allTablesQuery = query(tablesRef);
-            const allTablesSnapshot = await getDocs(allTablesQuery);
-            
-            // Find which table numbers are already used
-            const usedTableNumbers = new Set<number>();
-            allTablesSnapshot.docs.forEach(doc => {
-              usedTableNumbers.add((doc.data() as Table).tableNumber);
-            });
-            
-            // Ensure we don't exceed TOTAL_TABLES
-            if (usedTableNumbers.size >= TOTAL_TABLES) {
-              throw new Error('All tables are full. Maximum capacity reached.');
-            }
+            assignedTableName = getTableName(tableData.tableNumber, assignedTent);
+            assignedSeat = tableData.seat_count + 1;
 
-            // RANDOMIZED TABLE NUMBER SELECTION
-            // Find all available table numbers
-            const availableTableNumbers: number[] = [];
-            for (let i = 1; i <= TOTAL_TABLES; i++) {
-              if (!usedTableNumbers.has(i)) {
-                availableTableNumbers.push(i);
-              }
-            }
-            
-            // Randomly select from available table numbers for true randomization
-            const randomIndex = Math.floor(Math.random() * availableTableNumbers.length);
-            const newTableNumber = availableTableNumbers[randomIndex];
-
-            const newTable: Omit<Table, 'table_id'> = {
-              tableNumber: newTableNumber,
-              tableName: TABLE_NAMES[newTableNumber],
-              attendees: [newAttendee],
-              seat_count: 1,
-              maxCapacity: SEATS_PER_TABLE,
+            // Add attendee to existing table
+            const newAttendee: Attendee = {
+              name: sanitizedName,
+              email: sanitizedEmail,
+              phone: sanitizedPhone,
+              gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
+              tent: assignedTent,
+              registeredAt: new Date(),
             };
 
-            // Add new table
-            await addDoc(tablesRef, {
-              ...newTable,
-              table_id: `table_${newTableNumber}`,
+            const updatedAttendees = [...tableData.attendees, newAttendee];
+            
+            transaction.update(selectedTableDoc.ref, {
+              attendees: updatedAttendees,
+              seat_count: updatedAttendees.length,
             });
+          } else {
+            // No available tables in this tent, create a new one
+            // Find which base table numbers (1-9) are already used in this tent
+            const usedBaseTableNumbers = new Set<number>();
+            allTablesSnapshot.docs.forEach(doc => {
+              const data = doc.data() as Table;
+              if (data.tent === assignedTent) {
+                usedBaseTableNumbers.add(data.tableNumber);
+              }
+            });
+            
+            // Check if tent is full
+            if (usedBaseTableNumbers.size >= TABLES_PER_TENT) {
+              // This tent is full, try to assign to any other available table in any tent
+              const anyAvailableTables = allTablesSnapshot.docs
+                .map(doc => ({ doc, data: doc.data() as Table }))
+                .filter(({ data }) => data.seat_count < SEATS_PER_TABLE);
+              
+              if (anyAvailableTables.length > 0) {
+                // Randomly select from any available table
+                const randomIndex = Math.floor(Math.random() * anyAvailableTables.length);
+                const selectedTable = anyAvailableTables[randomIndex];
+                selectedTableDoc = selectedTable.doc;
+                const tableData = selectedTable.data;
+                
+                const actualTent = tableData.tent;
+                assignedTableNumber = tableData.tableNumber;
+                assignedTableName = getTableName(tableData.tableNumber, actualTent);
+                assignedSeat = tableData.seat_count + 1;
 
-            assignedTableNumber = newTableNumber;
-            assignedTableName = TABLE_NAMES[newTableNumber];
-            seatNumber = 1;
+                const newAttendee: Attendee = {
+                  name: sanitizedName,
+                  email: sanitizedEmail,
+                  phone: sanitizedPhone,
+                  gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
+                  tent: actualTent,
+                  registeredAt: new Date(),
+                };
+
+                const updatedAttendees = [...tableData.attendees, newAttendee];
+                
+                transaction.update(selectedTableDoc.ref, {
+                  attendees: updatedAttendees,
+                  seat_count: updatedAttendees.length,
+                });
+              } else {
+                throw new Error('All tables are full. Maximum capacity reached.');
+              }
+            } else {
+              // Create new table in this tent
+              // Find available base table numbers for this tent
+              const availableBaseTableNumbers: number[] = [];
+              for (let i = 1; i <= TABLES_PER_TENT; i++) {
+                if (!usedBaseTableNumbers.has(i)) {
+                  availableBaseTableNumbers.push(i);
+                }
+              }
+              
+              // Randomly select a base table number
+              const randomIndex = Math.floor(Math.random() * availableBaseTableNumbers.length);
+              const newBaseTableNumber = availableBaseTableNumbers[randomIndex];
+              
+              assignedTableNumber = newBaseTableNumber;
+              assignedTableName = getTableName(newBaseTableNumber, assignedTent);
+              assignedSeat = 1;
+
+              const newAttendee: Attendee = {
+                name: sanitizedName,
+                email: sanitizedEmail,
+                phone: sanitizedPhone,
+                gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
+                tent: assignedTent,
+                registeredAt: new Date(),
+              };
+
+              const newTable: Omit<Table, 'table_id'> = {
+                tableNumber: newBaseTableNumber,
+                tent: assignedTent,
+                tableName: assignedTableName,
+                attendees: [newAttendee],
+                seat_count: 1,
+                maxCapacity: SEATS_PER_TABLE,
+              };
+
+              await addDoc(tablesRef, {
+                ...newTable,
+                table_id: `table_${newBaseTableNumber}_tent_${assignedTent}`,
+              });
+            }
           }
 
           return {
             success: true,
             tableNumber: assignedTableNumber,
+            tent: assignedTent,
             tableName: assignedTableName,
-            seatNumber,
+            seatNumber: assignedSeat,
             name: sanitizedName,
             email: sanitizedEmail,
             phone: sanitizedPhone,
@@ -430,6 +347,7 @@ export async function POST(request: Request) {
         name: result.name,
         email: sanitizedEmail,
         table: result.tableNumber,
+        tent: result.tent,
         seat: result.seatNumber,
         phone: result.phone,
         gender: result.gender,
@@ -444,6 +362,7 @@ export async function POST(request: Request) {
           to: sanitizedEmail,
           name: result.name,
           tableNumber: result.tableNumber,
+          tent: result.tent,
           tableName: result.tableName,
           seatNumber: result.seatNumber,
           phone: result.phone,
@@ -509,6 +428,7 @@ export async function GET(request: Request) {
             phone: existingReg.phone,
             gender: existingReg.gender,
             tableNumber: existingReg.tableNumber,
+            tent: existingReg.tent,
             tableName: existingReg.tableName,
             seatNumber: existingReg.seatNumber,
             registeredAt: existingReg.registeredAt,

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import type { Table, AdminStats } from '@/types';
-import { TABLE_NAMES } from '@/types';
+import { BASE_TABLE_NAMES, TOTAL_TENTS, getTableName } from '@/types';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import EditUserModal from '@/components/EditUserModal';
@@ -16,18 +16,29 @@ import LoginModal from '@/components/LoginModal';
 import Link from 'next/link';
 import { generateBadgePDF, generateBatchBadgesPDF, downloadBadge, type BadgeData } from '@/lib/badgeGenerator';
 
+// Type for organized table data by base table and tent
+interface BaseTableData {
+  baseTableNumber: number;
+  baseTableName: string;
+  tents: {
+    [tentNumber: number]: (Table & { id: string }) | null;
+  };
+}
+
 function AdminPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [tables, setTables] = useState<(Table & { id: string })[]>([]);
-  const [filteredTables, setFilteredTables] = useState<(Table & { id: string })[]>([]);
+  const [organizedTables, setOrganizedTables] = useState<BaseTableData[]>([]);
+  const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'full'>('all');
   const [editUser, setEditUser] = useState<Table | null>(null);
   const [deleteUser, setDeleteUser] = useState<{ table: Table; seatIndex: number } | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
+  const prevSearchQuery = useRef('');
   const [stats, setStats] = useState<AdminStats>({
     totalTables: 0,
     totalAttendees: 0,
@@ -96,12 +107,34 @@ function AdminPageContent() {
           return {
             ...data,
             id: doc.id,
-            // Ensure tableName is populated from TABLE_NAMES if missing
-            tableName: data.tableName || TABLE_NAMES[data.tableNumber] || `Table ${data.tableNumber}`,
+            // Ensure tableName is populated
+            tableName: data.tableName || getTableName(data.tableNumber, data.tent) || `Table ${data.tableNumber}`,
           } as Table & { id: string };
         });
 
         setTables(tablesData);
+        
+        // Organize tables by base table and tent
+        const organized: BaseTableData[] = [];
+        for (let baseTableNum = 1; baseTableNum <= 9; baseTableNum++) {
+          const baseTableData: BaseTableData = {
+            baseTableNumber: baseTableNum,
+            baseTableName: BASE_TABLE_NAMES[baseTableNum],
+            tents: {},
+          };
+          
+          // Initialize all tent slots
+          for (let tentNum = 1; tentNum <= TOTAL_TENTS; tentNum++) {
+            const matchingTable = tablesData.find(
+              t => t.tableNumber === baseTableNum && t.tent === tentNum
+            );
+            baseTableData.tents[tentNum] = matchingTable || null;
+          }
+          
+          organized.push(baseTableData);
+        }
+        
+        setOrganizedTables(organized);
         setLoading(false);
         
         // Show toast for new registrations (skip on initial load)
@@ -159,39 +192,125 @@ function AdminPageContent() {
     });
   }, [tables]);
 
-  // Filter and search tables
+  // Filter organized tables based on search query (memoized to prevent recalculation)
+  const filteredOrganizedTables = useMemo(() => {
+    return organizedTables.map(baseTable => {
+      if (!searchQuery.trim()) {
+        return baseTable;
+      }
+
+      const query = searchQuery.toLowerCase().trim();
+      
+      // Check if base table number matches
+      const tableNumberMatches = baseTable.baseTableNumber.toString().includes(query);
+      
+      // Check if table name matches
+      const tableNameMatches = baseTable.baseTableName.toLowerCase().includes(query);
+
+      // Filter tents to only show those with matching attendees
+      const filteredTents: typeof baseTable.tents = {};
+      
+      Object.entries(baseTable.tents).forEach(([tentNum, tentTable]) => {
+        if (!tentTable) return;
+        
+        // Filter attendees within this tent
+        const matchingAttendees = tentTable.attendees.filter(attendee => {
+          const nameMatches = attendee.name.toLowerCase().includes(query);
+          const emailMatches = attendee.email.toLowerCase().includes(query);
+          const phoneMatches = attendee.phone?.toLowerCase().includes(query);
+          return nameMatches || emailMatches || phoneMatches;
+        });
+
+        // Include this tent if it has matching attendees OR if the table number/name matches
+        if (matchingAttendees.length > 0 || tableNumberMatches || tableNameMatches) {
+          filteredTents[Number(tentNum)] = {
+            ...tentTable,
+            attendees: matchingAttendees.length > 0 ? matchingAttendees : tentTable.attendees,
+          };
+        }
+      });
+
+      return {
+        ...baseTable,
+        tents: filteredTents,
+      };
+    }).filter(baseTable => {
+      // Only show base tables that have at least one tent with attendees after filtering
+      return Object.values(baseTable.tents).some(tent => tent && tent.attendees.length > 0);
+    });
+  }, [organizedTables, searchQuery]);
+
+  // Auto-expand accordions when searching (only when search query changes)
   useEffect(() => {
-    let filtered = [...tables];
-
-    // Filter out empty tables (tables with no attendees)
-    filtered = filtered.filter(t => t.attendees.length > 0);
-
-    // Apply status filter
-    if (filterStatus === 'available') {
-      filtered = filtered.filter(t => {
-        const actualSeats = t.attendees.length;
-        return actualSeats < t.maxCapacity;
-      });
-    } else if (filterStatus === 'full') {
-      filtered = filtered.filter(t => {
-        const actualSeats = t.attendees.length;
-        return actualSeats >= t.maxCapacity;
-      });
+    // Only run if search query actually changed
+    if (searchQuery.trim() !== prevSearchQuery.current) {
+      prevSearchQuery.current = searchQuery.trim();
+      
+      if (searchQuery.trim()) {
+        // Expand all accordions that have matching results
+        const accordionsToOpen = new Set<string>();
+        filteredOrganizedTables.forEach(baseTable => {
+          Object.keys(baseTable.tents).forEach(tentNum => {
+            const tent = baseTable.tents[Number(tentNum)];
+            if (tent && tent.attendees.length > 0) {
+              accordionsToOpen.add(`${baseTable.baseTableNumber}-${tentNum}`);
+            }
+          });
+        });
+        setOpenAccordions(accordionsToOpen);
+      }
     }
+  }, [searchQuery, filteredOrganizedTables]);
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      filtered = filtered.map(table => ({
-        ...table,
-        attendees: table.attendees.filter(attendee =>
-          attendee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          attendee.email.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
-      })).filter(table => table.attendees.length > 0);
-    }
+  // Helper function to highlight search matches
+  const highlightMatch = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    
+    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    return (
+      <span>
+        {parts.map((part, i) => 
+          part.toLowerCase() === query.toLowerCase() ? (
+            <mark key={i} className="bg-yellow-200 text-neutral-900 px-0.5 rounded">
+              {part}
+            </mark>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+      </span>
+    );
+  };
 
-    setFilteredTables(filtered);
-  }, [tables, searchQuery, filterStatus]);
+  // Toggle accordion
+  const toggleAccordion = (baseTableNumber: number, tentNumber: number) => {
+    const key = `${baseTableNumber}-${tentNumber}`;
+    setOpenAccordions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  // Expand all accordions (useful for search results)
+  const expandAll = () => {
+    const allKeys = new Set<string>();
+    filteredOrganizedTables.forEach(baseTable => {
+      Object.keys(baseTable.tents).forEach(tentNum => {
+        allKeys.add(`${baseTable.baseTableNumber}-${tentNum}`);
+      });
+    });
+    setOpenAccordions(allKeys);
+  };
+
+  // Collapse all accordions
+  const collapseAll = () => {
+    setOpenAccordions(new Set());
+  };
 
   // Export to CSV
   const exportToCSV = () => {
@@ -257,8 +376,16 @@ function AdminPageContent() {
       phone: attendee.phone,
       gender: attendee.gender,
       tableNumber: table.tableNumber,
+      tent: table.tent,
       tableName: table.tableName,
       seatNumber: attendeeIndex + 1,
+      qrCodeData: JSON.stringify({
+        name: attendee.name,
+        email: attendee.email,
+        table: table.tableNumber,
+        tent: table.tent,
+        seat: attendeeIndex + 1,
+      }),
     };
 
     try {
@@ -282,14 +409,22 @@ function AdminPageContent() {
         phone: attendee.phone,
         gender: attendee.gender,
         tableNumber: table.tableNumber,
+        tent: table.tent,
         tableName: table.tableName,
         seatNumber: index + 1,
+        qrCodeData: JSON.stringify({
+          name: attendee.name,
+          email: attendee.email,
+          table: table.tableNumber,
+          tent: table.tent,
+          seat: index + 1,
+        }),
       }));
 
     try {
       const toastId = toast.loading(`Generating ${badges.length} badges...`);
       const blob = await generateBatchBadgesPDF(badges);
-      downloadBadge(blob, `table-${table.tableNumber}-badges.pdf`);
+      downloadBadge(blob, `table-${table.tableNumber}-tent-${table.tent}-badges.pdf`);
       toast.dismiss(toastId);
       toast.success(`${badges.length} badges downloaded successfully!`);
     } catch (error) {
@@ -310,8 +445,16 @@ function AdminPageContent() {
           phone: attendee.phone,
           gender: attendee.gender,
           tableNumber: table.tableNumber,
+          tent: table.tent,
           tableName: table.tableName,
           seatNumber: index + 1,
+          qrCodeData: JSON.stringify({
+            name: attendee.name,
+            email: attendee.email,
+            table: table.tableNumber,
+            tent: table.tent,
+            seat: index + 1,
+          }),
         });
       });
     });
@@ -452,13 +595,66 @@ function AdminPageContent() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, email, or table number..."
-                className="w-full px-4 py-2.5 pl-10 border border-neutral-300 rounded-lg focus:border-golden-500 focus:ring-0 focus:outline-none transition-all"
+                placeholder="Search by name, email, phone, or table number..."
+                className="w-full px-4 py-2.5 pl-10 pr-10 border border-neutral-300 rounded-lg focus:border-golden-500 focus:ring-0 focus:outline-none transition-all"
               />
               <svg className="w-5 h-5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors"
+                  title="Clear search"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
+
+            {/* Search Results Info */}
+            {searchQuery && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-2"
+              >
+                <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-blue-800">
+                      Found <span className="font-semibold">{
+                        filteredOrganizedTables.reduce((total, baseTable) => {
+                          return total + Object.values(baseTable.tents).reduce((sum, tent) => {
+                            return sum + (tent?.attendees.length || 0);
+                          }, 0);
+                        }, 0)
+                      }</span> result(s) for &quot;{searchQuery}&quot;
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Clear
+                  </button>
+                </div>
+                
+                <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+                  <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-green-800">
+                    <span className="font-semibold">Accordions auto-expanded!</span> Sections with matching results are highlighted with a blue border and opened automatically. Matching text is highlighted in yellow.
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
             {/* Filter and Action Buttons - Improved Responsive Grid */}
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
@@ -515,6 +711,30 @@ function AdminPageContent() {
               {/* Row 2: Action buttons */}
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                 <button
+                  onClick={expandAll}
+                  className="flex-1 sm:flex-initial px-3 py-2.5 border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5"
+                  title="Expand all accordions"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span className="hidden md:inline">Expand All</span>
+                  <span className="md:hidden">Expand</span>
+                </button>
+
+                <button
+                  onClick={collapseAll}
+                  className="flex-1 sm:flex-initial px-3 py-2.5 border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5"
+                  title="Collapse all accordions"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  </svg>
+                  <span className="hidden md:inline">Collapse All</span>
+                  <span className="md:hidden">Collapse</span>
+                </button>
+
+                <button
                   onClick={handlePrintAllBadges}
                   disabled={tables.length === 0}
                   className="flex-1 sm:flex-initial px-3 py-2.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
@@ -556,207 +776,276 @@ function AdminPageContent() {
           </div>
         </motion.div>
 
-        {/* Tables Grid */}
-        {filteredTables.length === 0 ? (
+        {/* Tables Grid - Accordion Structure by Base Table */}
+        {tables.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl border border-neutral-200 shadow-soft">
             <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
               </svg>
             </div>
-            <p className="text-neutral-500">
-              {searchQuery || filterStatus !== 'all' ? 'No tables match your search' : 'No registrations yet'}
-            </p>
+            <p className="text-neutral-500">No registrations yet</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <AnimatePresence>
-              {filteredTables.map((table: Table & { id: string }, index) => {
-                // Calculate actual seat count from non-deleted attendees
-                const actualSeatCount = table.attendees.length;
-                
-                return (
-              <motion.div
-                key={table.id || index}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: index * 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                className="bg-white border border-neutral-200 rounded-xl p-6 shadow-soft hover:shadow-medium transition-shadow relative overflow-hidden"
-              >
-                {/* Decorative element */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-golden-50 rounded-full -translate-y-16 translate-x-16 opacity-30"></div>
-                
-                {/* Table Header */}
-                <div className="flex items-center justify-between mb-6 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-burgundy-700 to-burgundy-800 flex items-center justify-center text-white font-bold shadow-burgundy">
-                      {table.tableNumber}
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-burgundy-700 leading-tight">
-                        {table.tableName || `Table ${table.tableNumber}`}
-                      </h2>
-                      <p className="text-xs text-neutral-500 mt-0.5">Table {table.tableNumber}</p>
-                      {table.attendees.length > 0 && (
-                        <button
-                          onClick={() => handlePrintTableBadges(table)}
-                          className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-1"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                          </svg>
-                          Print badges
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`text-xs font-medium px-3 py-1 rounded-full ${
-                    actualSeatCount >= table.maxCapacity 
-                      ? 'bg-red-100 text-red-700' 
-                      : actualSeatCount >= table.maxCapacity * 0.8
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-golden-100 text-burgundy-700'
-                  }`}>
-                    {actualSeatCount}/{table.maxCapacity}
-                  </div>
+          <div className="space-y-6">
+            {filteredOrganizedTables.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-xl border border-neutral-200 shadow-soft">
+                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
                 </div>
+                <p className="text-neutral-500 text-lg font-medium mb-2">No results found</p>
+                <p className="text-neutral-400 text-sm">Try adjusting your search query</p>
+              </div>
+            ) : (
+              filteredOrganizedTables.map((baseTable, baseIndex) => {
+              // Check if this base table has any attendees across all tents
+              const hasAttendees = Object.values(baseTable.tents).some(
+                tent => tent && tent.attendees.length > 0
+              );
 
-                {/* Progress Bar */}
-                <div className="w-full bg-neutral-200 rounded-full h-1.5 mb-6 relative z-10">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(actualSeatCount / table.maxCapacity) * 100}%` }}
-                    transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${
-                      actualSeatCount >= table.maxCapacity
-                        ? 'bg-gradient-to-r from-red-600 to-red-500'
-                        : actualSeatCount >= table.maxCapacity * 0.8
-                        ? 'bg-gradient-to-r from-amber-600 to-amber-500'
-                        : 'bg-gradient-to-r from-burgundy-700 to-burgundy-800'
-                    }`}
-                  ></motion.div>
-                </div>
+              if (!hasAttendees) return null;
 
-                {/* Capacity Warning Badge */}
-                {actualSeatCount >= table.maxCapacity * 0.8 && actualSeatCount < table.maxCapacity && (
-                  <div className="mb-4 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 relative z-10">
-                    <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-xs text-amber-800 font-medium">
-                      Nearly full - {Math.round((actualSeatCount / table.maxCapacity) * 100)}% capacity
-                    </p>
-                  </div>
-                )}
-
-                {/* Attendees List */}
-                <div className="space-y-3 relative z-10">
-                  {table.attendees.map((attendee, idx: number) => (
-                    <div
-                      key={idx}
-                      className={`border-l-2 ${
-                        attendee.deleted 
-                          ? 'border-gray-400 bg-gray-50 opacity-70' 
-                          : 'border-golden-400 bg-white'
-                      } pl-3 py-2 hover:bg-golden-50/50 transition-colors rounded-r`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                            <p className="text-sm font-medium text-neutral-900">
-                              {attendee.name}
-                            </p>
-                            <span className="text-xs text-neutral-500">#{idx + 1}</span>
-                            {attendee.checkedIn && (
-                              <span className="text-xs px-1.5 py-0.5 bg-golden-100 text-burgundy-700 rounded-full flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
-                                Checked In
-                              </span>
-                            )}
-                            {attendee.gender && (
-                              <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                                {attendee.gender}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-neutral-600">
-                            {attendee.email}
-                          </p>
-                          {attendee.phone && (
-                            <p className="text-xs text-neutral-500 mt-0.5">
-                              📱 {attendee.phone}
-                            </p>
-                          )}
-                          {attendee.registeredAt && (
-                            <p className="text-xs text-neutral-400 mt-0.5">
-                              🕒 Registered: {format(
-                                attendee.registeredAt instanceof Date 
-                                  ? attendee.registeredAt 
-                                  : new Date((attendee.registeredAt as { seconds: number }).seconds * 1000),
-                                'MMM d, yyyy h:mm a'
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handlePrintBadge(table, idx)}
-                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                            aria-label="Print badge"
-                            title="Print badge"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleEditClick(table, idx)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            aria-label="Edit user"
-                            title="Edit user details"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(table, idx)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            aria-label="Delete user"
-                            title="Delete user"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
+              return (
+                <motion.div
+                  key={baseTable.baseTableNumber}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: baseIndex * 0.05, duration: 0.3 }}
+                  className="bg-white border border-neutral-200 rounded-xl shadow-soft overflow-hidden"
+                >
+                  {/* Base Table Header */}
+                  <div className="bg-gradient-to-r from-burgundy-50 to-golden-50 px-6 py-4 border-b border-neutral-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-burgundy-700 to-burgundy-800 flex items-center justify-center text-white font-bold shadow-burgundy">
+                        {baseTable.baseTableNumber}
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-xl font-bold text-burgundy-900">
+                          {baseTable.baseTableName}
+                        </h2>
+                        <p className="text-sm text-neutral-600">
+                          Table {baseTable.baseTableNumber} - All Tents
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Status Badge */}
-                {actualSeatCount >= table.maxCapacity && (
-                  <div className="mt-6 pt-4 border-t border-neutral-200 relative z-10">
-                    <div className="flex items-center justify-center gap-2 text-red-700">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <p className="text-xs font-medium uppercase tracking-widest">
-                        Full
-                      </p>
-                    </div>
                   </div>
-                )}
-              </motion.div>
+
+                  {/* Tent Accordions */}
+                  <div className="divide-y divide-neutral-200">
+                    {[1, 2, 3].map(tentNum => {
+                      const tentTable = baseTable.tents[tentNum];
+                      const accordionKey = `${baseTable.baseTableNumber}-${tentNum}`;
+                      const isOpen = openAccordions.has(accordionKey);
+                      const attendeeCount = tentTable?.attendees.length || 0;
+                      const maxCapacity = tentTable?.maxCapacity || 8;
+                      const hasSearchResults = searchQuery.trim() && tentTable && tentTable.attendees.length > 0;
+
+                      return (
+                        <div key={tentNum}>
+                          {/* Accordion Header */}
+                          <button
+                            onClick={() => toggleAccordion(baseTable.baseTableNumber, tentNum)}
+                            className={`w-full px-6 py-4 flex items-center justify-between hover:bg-neutral-50 transition-colors ${
+                              hasSearchResults ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-burgundy-700 bg-burgundy-100 px-3 py-1 rounded-full">
+                                  Tent {tentNum}
+                                </span>
+                                <span className="text-sm text-neutral-700 font-medium">
+                                  {getTableName(baseTable.baseTableNumber, tentNum)}
+                                </span>
+                                {hasSearchResults && (
+                                  <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-1 rounded-full flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                                    </svg>
+                                    {attendeeCount} match{attendeeCount !== 1 ? 'es' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`text-xs font-medium px-3 py-1 rounded-full ${
+                                attendeeCount >= maxCapacity 
+                                  ? 'bg-red-100 text-red-700' 
+                                  : attendeeCount >= maxCapacity * 0.8
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : attendeeCount > 0
+                                  ? 'bg-golden-100 text-burgundy-700'
+                                  : 'bg-neutral-100 text-neutral-500'
+                              }`}>
+                                {attendeeCount}/{maxCapacity} seats
+                              </div>
+                            </div>
+                            <svg 
+                              className={`w-5 h-5 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {/* Accordion Content */}
+                          <AnimatePresence>
+                            {isOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="px-6 py-4 bg-neutral-50">
+                                  {!tentTable || tentTable.attendees.length === 0 ? (
+                                    <p className="text-sm text-neutral-500 text-center py-4">
+                                      No attendees yet for this tent
+                                    </p>
+                                  ) : (
+                                    <div>
+                                      {/* Print badges button for this tent */}
+                                      {tentTable.attendees.length > 0 && (
+                                        <div className="mb-4 flex justify-end">
+                                          <button
+                                            onClick={() => handlePrintTableBadges(tentTable)}
+                                            className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 px-3 py-1.5 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                            </svg>
+                                            Print all badges for this tent
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {/* Attendees Table */}
+                                      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+                                        <table className="min-w-full divide-y divide-neutral-200">
+                                          <thead className="bg-neutral-100">
+                                            <tr>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Seat
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Name
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Email
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Phone
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Gender
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Registered
+                                              </th>
+                                              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-700 uppercase tracking-wider">
+                                                Actions
+                                              </th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="bg-white divide-y divide-neutral-200">
+                                            {tentTable.attendees.map((attendee, idx) => (
+                                              <tr key={idx} className="hover:bg-neutral-50 transition-colors">
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                  <span className="text-sm font-medium text-neutral-900">
+                                                    #{idx + 1}
+                                                  </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-neutral-900">
+                                                      {highlightMatch(attendee.name, searchQuery)}
+                                                    </span>
+                                                    {attendee.checkedIn && (
+                                                      <span className="text-xs px-1.5 py-0.5 bg-golden-100 text-burgundy-700 rounded-full">
+                                                        ✓
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                  <span className="text-sm text-neutral-600">
+                                                    {highlightMatch(attendee.email, searchQuery)}
+                                                  </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                  <span className="text-sm text-neutral-600">
+                                                    {attendee.phone ? highlightMatch(attendee.phone, searchQuery) : '-'}
+                                                  </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                  <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full">
+                                                    {attendee.gender || '-'}
+                                                  </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                  <span className="text-xs text-neutral-500">
+                                                    {attendee.registeredAt
+                                                      ? format(
+                                                          attendee.registeredAt instanceof Date
+                                                            ? attendee.registeredAt
+                                                            : new Date((attendee.registeredAt as { seconds: number }).seconds * 1000),
+                                                          'MMM d, h:mm a'
+                                                        )
+                                                      : '-'}
+                                                  </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-right">
+                                                  <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                      onClick={() => handlePrintBadge(tentTable, idx)}
+                                                      className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                                      title="Print badge"
+                                                    >
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                      </svg>
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleEditClick(tentTable, idx)}
+                                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                      title="Edit user"
+                                                    >
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                      </svg>
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleDeleteClick(tentTable, idx)}
+                                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                      title="Delete user"
+                                                    >
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                      </svg>
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
               );
-            })}
-            </AnimatePresence>
+            }))}
           </div>
         )}
 

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import { MONTSERRAT_BASE64, RAKKAS_BASE64 } from './embeddedFonts';
 
 export interface BadgeData {
   name: string;
@@ -7,397 +8,286 @@ export interface BadgeData {
   phone?: string;
   gender?: string;
   tableNumber: number;
+  tent: number;
   tableName?: string;
   seatNumber: number;
+  qrCodeData?: string;
+}
+
+let fontsRegistered = false;
+
+function registerFonts() {
+  if (fontsRegistered) return;
+  
+  try {
+    const pdfApi: any = (jsPDF as any).API;
+    
+    // Register Montserrat (use as default for body text)
+    pdfApi.addFileToVFS('Montserrat-Regular.ttf', MONTSERRAT_BASE64);
+    pdfApi.addFont('Montserrat-Regular.ttf', 'Montserrat', 'normal');
+    pdfApi.addFont('Montserrat-Regular.ttf', 'Montserrat', 'bold'); // Variable font handles weights
+    
+    // Register Rakkas (decorative display font)
+    pdfApi.addFileToVFS('Rakkas-Regular.ttf', RAKKAS_BASE64);
+    pdfApi.addFont('Rakkas-Regular.ttf', 'Rakkas', 'normal');
+    
+    fontsRegistered = true;
+    console.log('✓ Fonts registered successfully');
+  } catch (err) {
+    console.error('Font registration failed:', err);
+  }
 }
 
 export async function generateBadgePDF(attendee: BadgeData): Promise<Blob> {
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: [100, 210],
-  });
-
-  // Generate QR code with burgundy color
-  const qrDataUrl = await QRCode.toDataURL(
-    JSON.stringify({
-      name: attendee.name,
-      email: attendee.email,
-      phone: attendee.phone || '',
-      table: attendee.tableNumber,
-      tableName: attendee.tableName || '',
-      seat: attendee.seatNumber,
-      event: 'CACSAUI Love Feast'
-    }),
-    { width: 300, margin: 1, color: { dark: '#5C2A2A', light: '#ffffff' } }
-  );
-
-  // ========== MODERN GRADIENT HERO SECTION ==========
-  // Background gradient (burgundy to darker burgundy)
-  // pdf.setFillColor(92, 42, 42); // burgundy-700
-  // pdf.rect(0, 0, 100, 75, 'F');
+  // Landscape ticket: 8" x 2.5" (203.2mm x 63.5mm)
+  const W = 203.2;
+  const H = 63.5;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [H, W] });
   
-  // Overlay darker gradient at top
-  pdf.setFillColor(74, 31, 31); // burgundy-800
-  pdf.rect(0, 0, 100, 100, 'F');
-  
-  // Golden accent stripe (modern diagonal feel)
-  // pdf.setFillColor(212, 162, 68); // golden-500
-  // pdf.rect(0, 70, 100, 5, 'F');
+  registerFonts();
 
-  // Decorative circles (modern geometric pattern) - positioned at corners
-  // Top-left corner
-  pdf.setFillColor(212, 162, 68); // golden
-  pdf.circle(-10, -10, 40, 'F');
-  
-  // Top-right corner
-  pdf.setFillColor(255, 255, 255); // white
-  pdf.circle(110, -10, 40, 'F');
-  
-  // Bottom-left corner
-  pdf.setFillColor(255, 255, 255); // white
-  pdf.circle(-10, 100, 40, 'F');
-  
-  // Bottom-right corner
-  pdf.setFillColor(212, 162, 68); // golden
-  pdf.circle(110, 100, 40, 'F');
-
-  // Event Title - Modern Typography
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('CACSAUI PRESENTS', 50, 15, { align: 'center' });
-  
-  // Main Event Name - Bold & Large
-  pdf.setFontSize(22);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('LOVE FEAST', 50, 25, { align: 'center' });
-  
-  pdf.setFontSize(16);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('2025', 50, 33, { align: 'center' });
-
-  // Subtitle
-  pdf.setFontSize(7);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(212, 162, 68); // golden
-  pdf.text('UNIVERSITY OF IBADAN', 50, 40, { align: 'center' });
-
-  // Name Badge Section - Modern Card Style
-  pdf.setFontSize(6);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('ATTENDEE', 50, 50, { align: 'center' });
-
-  // Attendee Name - Large and Bold
-  pdf.setFontSize(16);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  const nameLines = pdf.splitTextToSize(attendee.name.toUpperCase(), 90);
-  const nameY = nameLines.length > 1 ? 56 : 58;
-  pdf.text(nameLines, 50, nameY, { align: 'center', maxWidth: 90 });
-
-  // Small decorative line under name
-  pdf.setDrawColor(212, 162, 68); // golden
-  pdf.setLineWidth(0.5);
-  const lineY = nameLines.length > 1 ? 64 : 63;
-  pdf.line(30, lineY, 70, lineY);
-
-  // ========== WHITE CONTENT SECTION ==========
-  // Clean white background for content
-  pdf.setFillColor(255, 255, 255);
-  pdf.rect(0, 75, 100, 135, 'F');
-
-  // ========== TABLE ASSIGNMENT - MODERN SPLIT DESIGN ==========
-  const tableY = 80;
-  
-  // Table Name Banner (if exists)
-  if (attendee.tableName) {
-    pdf.setFillColor(253, 246, 226); // golden-100
-    pdf.roundedRect(8, tableY, 84, 15, 2, 2, 'F');
-    
-    pdf.setFontSize(5);
-    pdf.setTextColor(92, 42, 42);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('YOUR TABLE', 50, tableY + 4, { align: 'center' });
-    
-    pdf.setFontSize(11);
-    pdf.setTextColor(92, 42, 42);
-    pdf.setFont('helvetica', 'bold');
-    const tableNameLines = pdf.splitTextToSize(attendee.tableName, 80);
-    pdf.text(tableNameLines, 50, tableY + 10, { align: 'center', maxWidth: 80 });
+  // Load trophy image
+  let trophyImage: string | undefined = undefined;
+  try {
+    const response = await fetch('/images/trophy.png');
+    if (response.ok) {
+      const blob = await response.blob();
+      trophyImage = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch (err) {
+    console.warn('Trophy image not found, using vector fallback', err);
   }
 
-  // Modern Number Cards - Side by Side with Icons
-  const cardsY = attendee.tableName ? tableY + 18 : tableY;
-  
-  // Left Card - Table Number
-  pdf.setFillColor(92, 42, 42); // burgundy
-  pdf.roundedRect(8, cardsY, 40, 42, 3, 3, 'F');
-  
-  // Icon circle background
-  pdf.setFillColor(212, 162, 68); // golden
-  pdf.circle(28, cardsY + 10, 6, 'F');
-  
-  // Icon text
-  pdf.setFontSize(10);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('T', 28, cardsY + 12, { align: 'center' });
-  
-  // Label
-  pdf.setFontSize(6);
-  pdf.setTextColor(212, 162, 68);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('TABLE', 28, cardsY + 22, { align: 'center' });
-  
-  // Number
-  pdf.setFontSize(24);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(attendee.tableNumber.toString(), 28, cardsY + 35, { align: 'center' });
+  // Generate QR code
+  let qrDataUrl: string | undefined = undefined;
+  try {
+    qrDataUrl = await QRCode.toDataURL(
+      attendee.qrCodeData || JSON.stringify(attendee),
+      { width: 400, margin: 0, color: { dark: '#D4A244', light: '#000000' } }
+    );
+  } catch (err) {
+    console.error('QR generation failed', err);
+  }
 
-  // Right Card - Seat Number
-  pdf.setFillColor(212, 162, 68); // golden
-  pdf.roundedRect(52, cardsY, 40, 42, 3, 3, 'F');
-  
-  // Icon circle background
-  pdf.setFillColor(92, 42, 42); // burgundy
-  pdf.circle(72, cardsY + 10, 6, 'F');
-  
-  // Icon text
-  pdf.setFontSize(10);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('S', 72, cardsY + 12, { align: 'center' });
-  
-  // Label
-  pdf.setFontSize(6);
-  pdf.setTextColor(92, 42, 42);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('SEAT', 72, cardsY + 22, { align: 'center' });
-  
-  // Number
-  pdf.setFontSize(24);
-  pdf.setTextColor(92, 42, 42);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(attendee.seatNumber.toString(), 72, cardsY + 35, { align: 'center' });
-
-  // ========== QR CODE SECTION - MODERN CENTERED ==========
-  const qrY = cardsY + 50;
-  
-  // QR Background with shadow effect
-  pdf.setFillColor(248, 248, 248); // very light gray
-  pdf.roundedRect(28, qrY - 2, 44, 44, 3, 3, 'F');
-  
-  pdf.setFillColor(255, 255, 255);
-  pdf.roundedRect(30, qrY, 40, 40, 2, 2, 'F');
-  
-  // Thin golden border
-  pdf.setDrawColor(212, 162, 68);
-  pdf.setLineWidth(0.3);
-  pdf.roundedRect(30, qrY, 40, 40, 2, 2, 'S');
-  
-  // Add QR code
-  pdf.addImage(qrDataUrl, 'PNG', 33, qrY + 3, 34, 34);
-
-  // QR Instructions - Modern Style
-  pdf.setFontSize(7);
-  pdf.setTextColor(92, 42, 42);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('SCAN TO CHECK IN', 50, qrY + 48, { align: 'center' });
-  
-  pdf.setFontSize(6);
-  pdf.setTextColor(120, 113, 108);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Present this at the entrance', 50, qrY + 53, { align: 'center' });
-
-  // ========== BOTTOM FOOTER - MODERN MINIMAL ==========
-  // Decorative elements
-  pdf.setFillColor(92, 42, 42);
-  pdf.circle(10, 202, 1.5, 'F');
-  pdf.circle(90, 202, 1.5, 'F');
-  
-  pdf.setFillColor(212, 162, 68);
-  pdf.circle(15, 202, 1, 'F');
-  pdf.circle(85, 202, 1, 'F');
-
-  // Bottom text
-  pdf.setFontSize(5);
-  pdf.setTextColor(168, 162, 158);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('An evening of fellowship & celebration', 50, 206, { align: 'center' });
-
+  renderTicket(pdf, attendee, qrDataUrl, trophyImage);
   return pdf.output('blob');
 }
 
-/**
- * Generate a batch of badges in a single PDF
- * Each badge appears on a separate page
- */
+function renderTicket(pdf: any, attendee: BadgeData, qrCode?: string, trophyImageData?: string) {
+  const W = 203.2;
+  const H = 63.5;
+  
+  // Layout configuration
+  const STUB_WIDTH = 42; // Wider stub for better layout
+  const PERF_X = W - STUB_WIDTH;
+  const LEFT_MARGIN = 12;
+  
+  // === BACKGROUND ===
+  pdf.setFillColor(18, 18, 18); // Deep black
+  pdf.rect(0, 0, W, H, 'F');
+  
+  // === WHITE STUB (Right Side) ===
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(PERF_X, 0, STUB_WIDTH, H, 'F');
+  
+  // Perforation with better serrated edge
+  pdf.setFillColor(18, 18, 18);
+  for (let y = 0; y < H; y += 3.5) {
+    pdf.triangle(PERF_X - 1, y, PERF_X + 0.8, y + 1.75, PERF_X - 1, y + 3.5, 'F');
+  }
+  
+  // === LEFT: TROPHY ICON ===
+  const trophyX = 5;
+  const trophyY = 5;
+  const trophySize = 50;
+  
+  if (trophyImageData) {
+    try {
+      pdf.addImage(trophyImageData, 'PNG', trophyX, trophyY, trophySize, trophySize);
+    } catch (err) {
+      console.warn('Trophy image failed, using fallback');
+    }
+  }
+  
+  if (!trophyImageData) {
+    // Enhanced vector trophy
+    pdf.setFillColor(212, 162, 68);
+    const cx = trophyX + trophySize / 2;
+    pdf.triangle(trophyX + 4, trophyY + trophySize * 0.45, 
+                 cx, trophyY + 2, 
+                 trophyX + trophySize - 4, trophyY + trophySize * 0.45, 'F');
+    pdf.rect(trophyX + 3, trophyY + trophySize * 0.42, trophySize - 6, 3.5, 'F');
+    pdf.rect(cx - 2.5, trophyY + trophySize * 0.5, 5, trophySize * 0.22, 'F');
+    pdf.rect(trophyX + 2, trophyY + trophySize * 0.72, trophySize - 4, 5, 'F');
+  }
+  
+  // === CENTER: EVENT DETAILS with proper hierarchy ===
+  const contentX = trophyX + trophySize + 10;
+  let currentY = 12;
+  
+  // Overline (subtle, uppercase, spaced)
+  pdf.setFont('Montserrat', 'normal');
+  pdf.setFontSize(6.5);
+  pdf.setTextColor(160, 140, 100);
+  pdf.text('C A C S A U I  P R E S E N T S', contentX, currentY);
+  currentY += 12;
+  
+  // Main Title (Large, decorative font)
+  pdf.setFont('Rakkas', 'normal');
+  pdf.setFontSize(36);
+  pdf.setTextColor(212, 162, 68);
+  pdf.text('LOVE FEAST', contentX, currentY);
+  currentY += 12;
+  
+  // Decorative divider
+  pdf.setDrawColor(212, 162, 68);
+  pdf.setLineWidth(0.3);
+  pdf.line(contentX, currentY, PERF_X - 10, currentY);
+  currentY += 8;
+  
+  // Event Details (clean, readable hierarchy)
+  pdf.setFont('Montserrat', 'normal');
+  pdf.setFontSize(6.2);
+  pdf.setTextColor(220, 220, 220);
+  
+  const details = [
+    { label: 'THEME', value: 'Love: A Commandment and Calling' },
+    { label: 'DATE', value: 'October 12th, 2025' },
+    { label: 'VENUE', value: 'Bello Hall, University of Ibadan' },
+    { label: 'TIME', value: '11:30 AM' },
+  ];
+  
+  details.forEach((detail) => {
+    pdf.setTextColor(200, 180, 120);
+    pdf.text(detail.label + ':', contentX, currentY);
+    pdf.setTextColor(220, 220, 220);
+    pdf.text(detail.value, contentX + 18, currentY);
+    currentY += 3.8;
+  });
+  
+  // === RIGHT STUB: GUEST INFORMATION (Redesigned) ===
+  const stubX = PERF_X + 4;
+  const stubInnerWidth = STUB_WIDTH - 8;
+  let stubY = 6;
+  
+  // Stub header
+  pdf.setFont('Montserrat', 'bold');
+  pdf.setFontSize(6.5);
+  pdf.setTextColor(40, 40, 40);
+  pdf.text('GUEST PASS', stubX, stubY);
+  stubY += 4;
+  
+  // Gold accent line
+  pdf.setDrawColor(212, 162, 68);
+  pdf.setLineWidth(0.5);
+  pdf.line(stubX, stubY - 1, stubX + stubInnerWidth, stubY - 1);
+  stubY += 2.5;
+  
+  // Guest name (wrapped if needed)
+  pdf.setFont('Montserrat', 'bold');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(30, 30, 30);
+  const nameLines = pdf.splitTextToSize(attendee.name.toUpperCase(), stubInnerWidth);
+  nameLines.slice(0, 2).forEach((line: string) => {
+    pdf.text(line, stubX, stubY);
+    stubY += 3.2;
+  });
+  stubY += 1;
+  
+  // Info cards (redesigned with better spacing)
+  const cardW = stubInnerWidth;
+  const cardH = 8;
+  
+  const drawCard = (label: string, value: string | number, color: 'gold' | 'white') => {
+    const isGold = color === 'gold';
+    
+    // Card background
+    pdf.setFillColor(isGold ? 212 : 248, isGold ? 162 : 248, isGold ? 68 : 248);
+    pdf.roundedRect(stubX, stubY, cardW, cardH, 1.2, 1.2, 'F');
+    
+    // Label (small, uppercase)
+    pdf.setFont('Montserrat', 'normal');
+    pdf.setFontSize(5.2);
+    pdf.setTextColor(40, 40, 40);
+    pdf.text(label, stubX + 2.5, stubY + 3.2);
+    
+    // Value (large, bold, right-aligned)
+    pdf.setFont('Montserrat', 'bold');
+    pdf.setFontSize(11);
+    pdf.setTextColor(20, 20, 20);
+    pdf.text(String(value), stubX + cardW - 2.5, stubY + 6.5, { align: 'right' });
+    
+    stubY += cardH + 1.5;
+  };
+  
+  drawCard('TENT', attendee.tent, 'gold');
+  drawCard('TABLE', attendee.tableNumber, 'white');
+  drawCard('SEAT', attendee.seatNumber, 'gold');
+  
+  stubY += 1.5;
+  
+  // QR Code (properly centered and sized to fit)
+  if (qrCode) {
+    const qrSize = 14; // Slightly smaller to ensure it fits
+    const qrX = stubX + (stubInnerWidth - qrSize) / 2;
+    
+    // White background for QR
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(qrX - 1, stubY - 1, qrSize + 2, qrSize + 2, 0.8, 0.8, 'F');
+    
+    // QR code
+    pdf.addImage(qrCode, 'PNG', qrX, stubY, qrSize, qrSize);
+  }
+}
+
 export async function generateBatchBadgesPDF(attendees: BadgeData[]): Promise<Blob> {
   const pdf = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
-    format: [85.6, 54],
+    format: [63.5, 203.2],
     compress: true,
   });
 
-  for (let i = 0; i < attendees.length; i++) {
-    if (i > 0) {
-      pdf.addPage();
+  registerFonts();
+
+  // Load trophy image once for all badges
+  let trophyImage: string | undefined = undefined;
+  try {
+    const response = await fetch('/images/trophy.png');
+    if (response.ok) {
+      const blob = await response.blob();
+      trophyImage = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
     }
+  } catch (err) {
+    console.warn('Trophy image not found for batch, using vector fallback', err);
+  }
+
+  for (let i = 0; i < attendees.length; i++) {
+    if (i > 0) pdf.addPage();
     
     const attendee = attendees[i];
+    let qrDataUrl: string | undefined = undefined;
     
-    // ===== MODERN HORIZONTAL BADGE DESIGN =====
-    
-    // Background - white
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, 85.6, 54, 'F');
-
-    // Left Section - Burgundy Hero (30% width)
-    pdf.setFillColor(92, 42, 42); // burgundy-700
-    pdf.rect(0, 0, 25, 54, 'F');
-    
-    // Darker overlay at top
-    pdf.setFillColor(74, 31, 31); // burgundy-800
-    pdf.rect(0, 0, 25, 20, 'F');
-
-    // Golden accent vertical stripe
-    pdf.setFillColor(212, 162, 68); // golden-500
-    pdf.rect(24, 0, 1, 54, 'F');
-
-    // Decorative circles on left
-    pdf.setFillColor(212, 162, 68, 0.1);
-    pdf.circle(-5, 10, 12, 'F');
-    pdf.circle(30, 45, 15, 'F');
-
-    // Event Title on left section - Vertical orientation feel
-    pdf.setFontSize(7);
-    pdf.setTextColor(212, 162, 68);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CACSAUI', 12.5, 12, { align: 'center' });
-    
-    pdf.setFontSize(10);
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('LOVE', 12.5, 20, { align: 'center' });
-    pdf.text('FEAST', 12.5, 27, { align: 'center' });
-    
-    pdf.setFontSize(9);
-    pdf.text('2025', 12.5, 34, { align: 'center' });
-
-    // Small subtitle
-    pdf.setFontSize(4);
-    pdf.setTextColor(212, 162, 68);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('UI', 12.5, 42, { align: 'center' });
-
-    // Right Section - Content
-    const contentStartX = 28;
-    
-    // Attendee Name - Top Priority
-    pdf.setFontSize(11);
-    pdf.setTextColor(92, 42, 42);
-    pdf.setFont('helvetica', 'bold');
-    const nameLines = pdf.splitTextToSize(attendee.name.toUpperCase() || '', 52);
-    pdf.text(nameLines, contentStartX, 10, { maxWidth: 52 });
-
-    // Small divider
-    pdf.setDrawColor(212, 162, 68);
-    pdf.setLineWidth(0.3);
-    pdf.line(contentStartX, 14, contentStartX + 25, 14);
-
-    // Table Name (if exists)
-    let currentY = 18;
-    if (attendee.tableName) {
-      pdf.setFontSize(5);
-      pdf.setTextColor(120, 113, 108);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('TABLE', contentStartX, currentY);
-      
-      pdf.setFontSize(8);
-      pdf.setTextColor(92, 42, 42);
-      pdf.setFont('helvetica', 'bold');
-      const tableNameLines = pdf.splitTextToSize(attendee.tableName, 52);
-      pdf.text(tableNameLines, contentStartX, currentY + 4, { maxWidth: 52 });
-      currentY += tableNameLines.length > 1 ? 10 : 8;
-    }
-
-    // Number Cards - Compact Side by Side
-    const cardsY = currentY + 2;
-    
-    // Table Card - Burgundy
-    pdf.setFillColor(92, 42, 42);
-    pdf.roundedRect(contentStartX, cardsY, 22, 18, 2, 2, 'F');
-    
-    pdf.setFontSize(5);
-    pdf.setTextColor(212, 162, 68);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('TABLE', contentStartX + 11, cardsY + 5, { align: 'center' });
-    
-    pdf.setFontSize(16);
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(attendee.tableNumber.toString(), contentStartX + 11, cardsY + 14, { align: 'center' });
-
-    // Seat Card - Golden
-    pdf.setFillColor(212, 162, 68);
-    pdf.roundedRect(contentStartX + 24, cardsY, 22, 18, 2, 2, 'F');
-    
-    pdf.setFontSize(5);
-    pdf.setTextColor(92, 42, 42);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('SEAT', contentStartX + 35, cardsY + 5, { align: 'center' });
-    
-    pdf.setFontSize(16);
-    pdf.setTextColor(92, 42, 42);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(attendee.seatNumber.toString(), contentStartX + 35, cardsY + 14, { align: 'center' });
-
-    // QR Code - Top Right Corner
-    const qrSize = 16;
-    const qrX = 85.6 - qrSize - 3;
-    const qrY = 3;
-    
-    // QR background
-    pdf.setFillColor(248, 248, 248);
-    pdf.roundedRect(qrX - 1, qrY - 1, qrSize + 2, qrSize + 2, 1, 1, 'F');
-    
-    const qrData = JSON.stringify({
-      name: attendee.name,
-      email: attendee.email,
-      table: attendee.tableNumber,
-      tableName: attendee.tableName || '',
-      seat: attendee.seatNumber,
-      phone: attendee.phone,
-      gender: attendee.gender,
-      event: 'CACSAUI Love Feast',
-    });
-
     try {
-      const canvas = document.createElement('canvas');
-      await QRCode.toCanvas(canvas, qrData, {
-        width: 200,
-        margin: 1,
-        color: {
-          dark: '#5C2A2A',
-          light: '#FFFFFF',
-        },
-      });
-
-      const qrImageData = canvas.toDataURL('image/png');
-      pdf.addImage(qrImageData, 'PNG', qrX, qrY, qrSize, qrSize);
-    } catch (error) {
-      console.error('QR code generation error:', error);
+      qrDataUrl = await QRCode.toDataURL(
+        JSON.stringify(attendee),
+        { width: 400, margin: 0, color: { dark: '#D4A244', light: '#000000' } }
+      );
+    } catch (err) {
+      console.warn('QR generation failed for batch', err);
     }
 
-    // Bottom instruction text
-    pdf.setFontSize(4);
-    pdf.setTextColor(168, 162, 158);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Scan QR to check in', contentStartX, 50);
+    renderTicket(pdf, attendee, qrDataUrl, trophyImage);
   }
 
   return pdf.output('blob');

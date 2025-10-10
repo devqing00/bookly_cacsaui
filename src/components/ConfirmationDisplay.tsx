@@ -12,6 +12,7 @@ interface ConfirmationDisplayProps {
   email?: string;
   tableNumber: number;
   tableName?: string;
+  tent?: number;
   seatNumber?: number;
   isExisting?: boolean;
   phone?: string;
@@ -24,6 +25,7 @@ export default function ConfirmationDisplay({
   email = '',
   tableNumber,
   tableName = '',
+  tent = 1,
   seatNumber = 1,
   isExisting = false,
   phone = '',
@@ -89,6 +91,7 @@ export default function ConfirmationDisplay({
   const registrationData = JSON.stringify({
     name,
     email,
+    tent: tent,
     table: tableNumber,
     tableName,
     seat: seatNumber,
@@ -107,6 +110,7 @@ export default function ConfirmationDisplay({
         gender,
         tableNumber: tableNumber,
         tableName: tableName,
+        tent: tent,
         seatNumber: seatNumber,
       });
       downloadBadge(badge, `${name.replace(/\s+/g, '_')}_Badge.pdf`);
@@ -198,6 +202,13 @@ export default function ConfirmationDisplay({
           {/* Background pattern */}
           <div className="absolute inset-0 opacity-5">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle,rgb(212,162,68)_1px,transparent_1px)] bg-[length:16px_16px]"></div>
+          </div>
+          
+          {/* Tent Badge */}
+          <div className="relative z-10 mb-4">
+            <span className="inline-block text-xs font-bold text-burgundy-700 bg-burgundy-100 px-4 py-1.5 rounded-full uppercase tracking-widest">
+              Tent {tent}
+            </span>
           </div>
           
           {/* Table Name Header */}
