@@ -71,6 +71,59 @@ async function checkExistingRegistration(email: string) {
   return { exists: false };
 }
 
+// Helper function to calculate gender balance score for a table
+// Lower score = better balance, higher score = more imbalanced
+function calculateGenderBalanceScore(attendees: Attendee[], newGender: string): number {
+  const genderCounts: Record<string, number> = {
+    Male: 0,
+    Female: 0,
+    Other: 0,
+    'Prefer not to say': 0,
+  };
+
+  // Count existing genders
+  attendees.forEach(attendee => {
+    if (attendee.gender in genderCounts) {
+      genderCounts[attendee.gender]++;
+    }
+  });
+
+  // Add the new attendee
+  if (newGender in genderCounts) {
+    genderCounts[newGender]++;
+  }
+
+  // Calculate variance (measure of imbalance)
+  const counts = Object.values(genderCounts);
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  const average = total / counts.length;
+  
+  const variance = counts.reduce((sum, count) => {
+    return sum + Math.pow(count - average, 2);
+  }, 0) / counts.length;
+
+  return variance;
+}
+
+// Helper function to find the best table for gender balance
+function findBestTableForGenderBalance(
+  availableTables: Array<{ doc: QueryDocumentSnapshot<DocumentData>; data: Table }>,
+  gender: string
+): { doc: QueryDocumentSnapshot<DocumentData>; data: Table } | null {
+  if (availableTables.length === 0) return null;
+
+  // Calculate balance scores for each table
+  const tablesWithScores = availableTables.map(table => ({
+    table,
+    score: calculateGenderBalanceScore(table.data.attendees, gender),
+  }));
+
+  // Sort by score (lower is better) and return the best one
+  tablesWithScores.sort((a, b) => a.score - b.score);
+  
+  return tablesWithScores[0].table;
+}
+
 export async function POST(request: Request) {
   try {
     const { name, email, phone, gender, checkOnly } = await request.json();
@@ -161,7 +214,7 @@ export async function POST(request: Request) {
           const allTablesQuery = query(tablesRef);
           const allTablesSnapshot = await getDocs(allTablesQuery);
           
-          // COMPLETELY RANDOM ASSIGNMENT: Randomly select tent first
+          // GENDER-BALANCED ASSIGNMENT: Randomly select tent first
           const assignedTent = Math.floor(Math.random() * TOTAL_TENTS) + 1; // 1, 2, or 3
           
           // Filter tables for the selected tent with available seats
@@ -169,38 +222,40 @@ export async function POST(request: Request) {
             .map(doc => ({ doc, data: doc.data() as Table }))
             .filter(({ data }) => data.tent === assignedTent && data.seat_count < SEATS_PER_TABLE);
           
-          let assignedTableNumber: number;
-          let assignedTableName: string;
-          let assignedSeat: number;
+          let assignedTableNumber!: number;
+          let assignedTableName!: string;
+          let assignedSeat!: number;
           let selectedTableDoc: QueryDocumentSnapshot<DocumentData> | null = null;
 
           if (tentTables.length > 0) {
-            // Randomly select from available tables in this tent
-            const randomTableIndex = Math.floor(Math.random() * tentTables.length);
-            const selectedTable = tentTables[randomTableIndex];
-            selectedTableDoc = selectedTable.doc;
-            const tableData = selectedTable.data;
-
-            assignedTableNumber = tableData.tableNumber;
-            assignedTableName = getTableName(tableData.tableNumber, assignedTent);
-            assignedSeat = tableData.seat_count + 1;
-
-            // Add attendee to existing table
-            const newAttendee: Attendee = {
-              name: sanitizedName,
-              email: sanitizedEmail,
-              phone: sanitizedPhone,
-              gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
-              tent: assignedTent,
-              registeredAt: new Date(),
-            };
-
-            const updatedAttendees = [...tableData.attendees, newAttendee];
+            // Find the best table for gender balance in this tent
+            const bestTable = findBestTableForGenderBalance(tentTables, sanitizedGender);
             
-            transaction.update(selectedTableDoc.ref, {
-              attendees: updatedAttendees,
-              seat_count: updatedAttendees.length,
-            });
+            if (bestTable) {
+              selectedTableDoc = bestTable.doc;
+              const tableData = bestTable.data;
+
+              assignedTableNumber = tableData.tableNumber;
+              assignedTableName = getTableName(tableData.tableNumber, assignedTent);
+              assignedSeat = tableData.seat_count + 1;
+
+              // Add attendee to existing table
+              const newAttendee: Attendee = {
+                name: sanitizedName,
+                email: sanitizedEmail,
+                phone: sanitizedPhone,
+                gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
+                tent: assignedTent,
+                registeredAt: new Date(),
+              };
+
+              const updatedAttendees = [...tableData.attendees, newAttendee];
+              
+              transaction.update(selectedTableDoc.ref, {
+                attendees: updatedAttendees,
+                seat_count: updatedAttendees.length,
+              });
+            }
           } else {
             // No available tables in this tent, create a new one
             // Find which base table numbers (1-9) are already used in this tent
@@ -220,32 +275,36 @@ export async function POST(request: Request) {
                 .filter(({ data }) => data.seat_count < SEATS_PER_TABLE);
               
               if (anyAvailableTables.length > 0) {
-                // Randomly select from any available table
-                const randomIndex = Math.floor(Math.random() * anyAvailableTables.length);
-                const selectedTable = anyAvailableTables[randomIndex];
-                selectedTableDoc = selectedTable.doc;
-                const tableData = selectedTable.data;
+                // Use gender balancing to select from any available table
+                const bestTable = findBestTableForGenderBalance(anyAvailableTables, sanitizedGender);
                 
-                const actualTent = tableData.tent;
-                assignedTableNumber = tableData.tableNumber;
-                assignedTableName = getTableName(tableData.tableNumber, actualTent);
-                assignedSeat = tableData.seat_count + 1;
+                if (bestTable) {
+                  selectedTableDoc = bestTable.doc;
+                  const tableData = bestTable.data;
+                  
+                  const actualTent = tableData.tent;
+                  assignedTableNumber = tableData.tableNumber;
+                  assignedTableName = getTableName(tableData.tableNumber, actualTent);
+                  assignedSeat = tableData.seat_count + 1;
 
-                const newAttendee: Attendee = {
-                  name: sanitizedName,
-                  email: sanitizedEmail,
-                  phone: sanitizedPhone,
-                  gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
-                  tent: actualTent,
-                  registeredAt: new Date(),
-                };
+                  const newAttendee: Attendee = {
+                    name: sanitizedName,
+                    email: sanitizedEmail,
+                    phone: sanitizedPhone,
+                    gender: sanitizedGender as 'Male' | 'Female' | 'Other' | 'Prefer not to say',
+                    tent: actualTent,
+                    registeredAt: new Date(),
+                  };
 
-                const updatedAttendees = [...tableData.attendees, newAttendee];
-                
-                transaction.update(selectedTableDoc.ref, {
-                  attendees: updatedAttendees,
-                  seat_count: updatedAttendees.length,
-                });
+                  const updatedAttendees = [...tableData.attendees, newAttendee];
+                  
+                  transaction.update(selectedTableDoc.ref, {
+                    attendees: updatedAttendees,
+                    seat_count: updatedAttendees.length,
+                  });
+                } else {
+                  throw new Error('Unable to find suitable table.');
+                }
               } else {
                 throw new Error('All tables are full. Maximum capacity reached.');
               }
